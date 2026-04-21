@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Camera, StopCircle, PlayCircle, AlertTriangle, Users } from 'lucide-react';
+import { useLiveActionMultiPerson } from '../hooks/useLiveActionMultiPerson';
 
 const LiveActionMultiPerson = () => {
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [operationMode, setOperationMode] = useState<string>('Modo Operativo (Por defecto)');
-  const [poseMode, setPoseMode] = useState<'2D' | '3D'>('2D');
-
-  const toggleStream = () => {
-    setIsStreaming(!isStreaming);
-  };
+  const {
+    isStreaming,
+    operationMode, setOperationMode,
+    poseMode, setPoseMode,
+    toggleStream
+  } = useLiveActionMultiPerson();
 
   return (
     <div className="p-8 max-w-7xl mx-auto">

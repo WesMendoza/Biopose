@@ -1,33 +1,14 @@
-import React, { useState } from 'react';
 import { UserPlus, User, Mail, Lock, Building, CheckCircle } from 'lucide-react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { useCreateAccount } from '../hooks/useCreateAccount';
 
 const CreateAccount = () => {
-  const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    identificacion: '',
-    nombres: '',
-    apellidos: '',
-    correo: '',
-    empresa: '',
-    celular: '',
-    password: '',
-  });
-
-  const [isSuccess, setIsSuccess] = useState(false);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Simulate API call to create account
-    setIsSuccess(true);
-    setTimeout(() => {
-      navigate('/login');
-    }, 2500);
-  };
+  const {
+    formData,
+    isSuccess,
+    handleChange,
+    handleSubmit
+  } = useCreateAccount();
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">

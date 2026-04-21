@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Camera, Settings, StopCircle, PlayCircle, AlertTriangle } from 'lucide-react';
+import { useLiveDetection } from '../hooks/useLiveDetection';
 
 const LiveDetection = () => {
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [framesSkip, setFramesSkip] = useState(3);
-  const [poseMode, setPoseMode] = useState<'2D' | '3D'>('2D');
-
-  const toggleStream = () => {
-    setIsStreaming(!isStreaming);
-  };
+  const {
+    isStreaming,
+    framesSkip, setFramesSkip,
+    poseMode, setPoseMode,
+    toggleStream
+  } = useLiveDetection();
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
