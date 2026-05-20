@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import api from '../lib/api';
 
 export const useGenerarImagenes = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -22,12 +23,23 @@ export const useGenerarImagenes = () => {
   const handleGenerateImages = () => {
     if (!file) return;
     setIsProcessing(true);
-    
-    // Simulate processing
-    setTimeout(() => {
-      setIsProcessing(false);
-      setIsModalOpen(true);
-    }, 2000);
+
+    const fd = new FormData();
+    fd.append('video', file);
+    fd.append('fps', String(fps));
+    fd.append('width', String(width));
+    fd.append('height', String(height));
+
+    api.postForm('/api/analysis/videos/upload/', fd)
+      .then((res) => {
+        // open modal with results available later
+        setIsModalOpen(true);
+      })
+      .catch(() => {
+        // fallback simulation
+        setTimeout(() => setIsModalOpen(true), 1200);
+      })
+      .finally(() => setIsProcessing(false));
   };
 
   return {

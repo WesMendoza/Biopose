@@ -1,10 +1,7 @@
 import { useState } from 'react';
+import type { RouteItem } from '../interface/RouteItem';
 
-export interface RouteItem {
-  id: number;
-  directory: string;
-  createdAt: string;
-}
+
 
 export const useConfiguracionRutas = () => {
   const [mainPath, setMainPath] = useState('');

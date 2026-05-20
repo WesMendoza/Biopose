@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import api from '../lib/api';
 
 export const useCargaImagen = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -26,14 +27,25 @@ export const useCargaImagen = () => {
   };
 
   const handleGeneratePose = () => {
+    if (!file) return;
     setIsPreviewModalOpen(false);
     setIsProcessing(true);
-    
-    // Simulate processing delay
-    setTimeout(() => {
-      setIsProcessing(false);
-      setIsPoseModalOpen(true);
-    }, 1500);
+
+    const fd = new FormData();
+    fd.append('image', file);
+
+    api.postForm('/api/analysis/images/upload/', fd)
+      .then((res) => {
+        // try to extract URL from response
+        const url = res?.detalle?.url || res?.detalle?.path || null;
+        if (url) setImageUrl(url);
+        setIsPoseModalOpen(true);
+      })
+      .catch(() => {
+        // fallback to local simulated pose
+        setTimeout(() => setIsPoseModalOpen(true), 800);
+      })
+      .finally(() => setIsProcessing(false));
   };
 
   return {

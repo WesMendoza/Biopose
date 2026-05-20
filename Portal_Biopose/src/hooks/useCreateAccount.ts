@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../lib/api';
 
 export const useCreateAccount = () => {
   const navigate = useNavigate();
@@ -21,11 +22,24 @@ export const useCreateAccount = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate API call to create account
-    setIsSuccess(true);
-    setTimeout(() => {
-      navigate('/login');
-    }, 2500);
+    // Call backend register endpoint
+    const payload = {
+      nombre: formData.nombres,
+      apellido: formData.apellidos,
+      cedula: formData.identificacion,
+      correo: formData.correo,
+      password: formData.password,
+    };
+
+    api.post('/api/auth/registerAccount/', payload)
+      .then((res) => {
+        setIsSuccess(true);
+        setTimeout(() => navigate('/login'), 1200);
+      })
+      .catch((err) => {
+        // Show error (basic)
+        alert(err?.response?.mensaje || 'Error registrando usuario');
+      });
   };
 
   return {

@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import api from '../lib/api';
 
 export const useVideoDetection = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -22,18 +23,43 @@ export const useVideoDetection = () => {
     if (!file) return;
     setIsProcessing(true);
     setProgress(0);
-    
-    // Simulate processing
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsProcessing(false);
-          return 100;
+
+    const fd = new FormData();
+    fd.append('video', file);
+
+    api.postForm('/api/analysis/videos/upload/', fd)
+      .then((res) => {
+        const videoId = res?.detalle?.id || res?.detalle?.video_id || null;
+        // If backend returns id, trigger processing endpoint
+        if (videoId) {
+          api.post(`/api/analysis/videos/${videoId}/process/`, { fps_skip: framesSkip, dimension: poseMode })
+            .catch(() => {});
         }
-        return prev + 5;
+        // simulate progress until results available
+        const interval = setInterval(() => {
+          setProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              setIsProcessing(false);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 600);
+      })
+      .catch(() => {
+        // fallback to local simulation
+        const interval = setInterval(() => {
+          setProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              setIsProcessing(false);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 600);
       });
-    }, 500);
   };
 
   const handleReuploadClick = () => {

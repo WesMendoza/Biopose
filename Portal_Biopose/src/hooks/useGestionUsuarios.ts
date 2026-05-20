@@ -1,33 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import api from '../lib/api';
+import type { User } from '../interface/User';
 
-export interface User {
-  id: number;
-  fullName: string;
-  identification: string;
-  email: string;
-  role: string;
-  isActive: boolean;
-}
+
 
 export const useGestionUsuarios = () => {
-  const [users, setUsers] = useState<User[]>([
-    {
-      id: 1,
-      fullName: 'Juan Perez',
-      identification: '123456789',
-      email: 'juan@example.com',
-      role: 'Administrador',
-      isActive: true,
-    },
-    {
-      id: 2,
-      fullName: 'Ana Martinez',
-      identification: '987654321',
-      email: 'ana@example.com',
-      role: 'Visitante',
-      isActive: false,
-    },
-  ]);
+  const [users, setUsers] = useState<User[]>([]);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -49,21 +27,64 @@ export const useGestionUsuarios = () => {
     setSelectedUser(null);
   };
 
-  const handleSaveUser = () => {
+ const handleSaveUser = async () => {
     if (selectedUser) {
-      setUsers(
-        users.map((u) => (u.id === selectedUser.id ? selectedUser : u))
-      );
+      try {
+        const payload = {
+          nombre: selectedUser.fullName.split(' ')[0], 
+          apellido: selectedUser.fullName.split(' ').slice(1).join(' '),
+          correo: selectedUser.email,
+          // Nota: Verifica que el backend no exija el password aquí
+        };
+
+        // Consumimos tu endpoint personalizado de PATCH por cédula
+        await api.patch(`/api/users/actualizar-por-cedula/${selectedUser.identification}/`, payload);
+        
+        // Actualizamos estado visual
+        setUsers(users.map((u) => (u.id === selectedUser.id ? selectedUser : u)));
+        closeModals();
+        
+      } catch (err: any) {
+        alert(err?.response?.mensaje || 'Error actualizando usuario');
+      }
     }
-    closeModals();
   };
 
   const confirmDelete = () => {
     if (selectedUser) {
-      setUsers(users.filter((u) => u.id !== selectedUser.id));
+      // Call API to perform logical delete by cedula
+      api.del(`/api/users/eliminar/${selectedUser.identification}/`)
+        .then(() => {
+          setUsers(users.filter((u) => u.id !== selectedUser.id));
+          closeModals();
+        })
+        .catch((err) => {
+          alert(err?.response?.mensaje || 'Error eliminando usuario');
+        });
+    } else {
+      closeModals();
     }
-    closeModals();
   };
+
+  useEffect(() => {
+    // Fetch users on mount
+    api.get('/api/users/')
+      .then((res) => {
+        const list = res?.detalle || [];
+        const mapped: User[] = list.map((u: any) => ({
+          id: u.idUsuario ?? u.id ?? 0,
+          fullName: `${u.nombre || ''} ${u.apellido || ''}`.trim(),
+          identification: u.cedula || u.identificacion || '',
+          email: u.correo || u.email || '',
+          role: u.idRol ? String(u.idRol) : 'N/A',
+          isActive: (u.estado || 'A') === 'A'
+        }));
+        setUsers(mapped);
+      })
+      .catch(() => {
+        // keep empty list on error
+      });
+  }, []);
 
   return {
     users,

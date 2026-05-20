@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE } from '../config';
 
 export const useLogin = () => {
   const navigate = useNavigate();
@@ -7,13 +8,35 @@ export const useLogin = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email && password) {
-      navigate('/dashboard');
-    } else {
+    setError('');
+    if (!email || !password) {
       setError('Por favor complete todos los campos');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/login/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ correo: email, password })
+      });
+
+      const data = await res.json();
+      if (res.ok && data?.detalle?.token) {
+        localStorage.setItem('token', data.detalle.token);
+        navigate('/dashboard');
+      } else {
+        setError(data?.mensaje || 'Credenciales inválidas');
+      }
+    } catch (err) {
+      setError('Error de conexión al servidor');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -25,6 +48,7 @@ export const useLogin = () => {
     showPassword,
     setShowPassword,
     error,
+    loading,
     handleLogin
   };
 };
