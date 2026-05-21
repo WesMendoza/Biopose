@@ -12,6 +12,8 @@ import VideoActionMultiPerson from './pages/VideoActionMultiPerson';
 import LiveDetection from './pages/LiveDetection';
 import LiveActionMultiPerson from './pages/LiveActionMultiPerson';
 import Layout from './components/Layout';
+import GestionEmpresas from './pages/GestionEmpresas';
+import GestionRoles from './pages/GestionRoles';
 
 const AppRouter = () => {
   return (
@@ -36,6 +38,8 @@ const AppRouter = () => {
           
           <Route path="/events/multi/video" element={<VideoActionMultiPerson />} />
           <Route path="/events/multi/live" element={<LiveActionMultiPerson />} />
+          <Route path="/gestion-empresas" element={<GestionEmpresas />} />
+          <Route path="/gestion-roles" element={<GestionRoles />} />
         </Route>
       </Routes>
     </BrowserRouter>

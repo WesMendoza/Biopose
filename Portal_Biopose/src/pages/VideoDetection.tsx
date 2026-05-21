@@ -1,5 +1,5 @@
 import React from 'react';
-import { Upload, Settings, RefreshCw, CheckCircle, AlertTriangle, CloudUpload, Loader } from 'lucide-react';
+import { Upload, Settings, RefreshCw, CheckCircle, AlertTriangle, CloudUpload, Loader, Download } from 'lucide-react';
 import { useVideoDetection } from '../hooks/useVideoDetection';
 
 const VideoDetection = () => {
@@ -10,6 +10,9 @@ const VideoDetection = () => {
     progress,
     framesSkip, setFramesSkip,
     poseMode, setPoseMode,
+    processedStreamUrl,  
+    downloadUrl,         
+    analysisResults,     
     fileInputRef,
     handleFileChange,
     handleProcessVideo,
@@ -122,9 +125,9 @@ const VideoDetection = () => {
           <div className="flex-grow bg-gray-100 rounded-md flex items-center justify-center overflow-hidden relative min-h-[300px]">
             {videoUrl ? (
               <video 
-                src={videoUrl} 
+                src={videoUrl || undefined} // <-- CORREGIDO: Evita el tipo 'null' asignando 'undefined'
                 controls 
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain bg-black"
               />
             ) : (
               <div className="text-center p-6 flex flex-col items-center">
@@ -137,19 +140,32 @@ const VideoDetection = () => {
 
         {/* Processed Video */}
         <div className="bg-white rounded-lg shadow-md p-4 border border-gray-100 flex flex-col">
-          <h4 className="text-lg font-semibold text-gray-700 flex items-center mb-3">
-            <Loader className={`w-5 h-5 mr-2 text-indigo-500 ${isProcessing ? 'animate-spin' : ''}`} />
-            Video Procesado
-          </h4>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-lg font-semibold text-gray-700 flex items-center">
+              <Loader className={`w-5 h-5 mr-2 text-indigo-500 ${isProcessing ? 'animate-spin' : ''}`} />
+              Video Procesado
+            </h4>
+            {downloadUrl && (
+              <a 
+                href={downloadUrl} 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition"
+              >
+                <Download className="w-4 h-4 mr-1" /> Descargar
+              </a>
+            )}
+          </div>
           <hr className="mb-4 border-gray-200" />
           
-          <div className="flex-grow bg-gray-900 rounded-md flex items-center justify-center overflow-hidden min-h-[300px]">
+          <div className="flex-grow bg-gray-900 rounded-md flex items-center justify-center overflow-hidden min-h-[300px] relative">
             {progress === 100 && !isProcessing ? (
-              <div className="text-center">
-                <p className="text-green-400 mb-2 font-medium">Procesado Completo</p>
-                {/* Normally an img tag displaying stream or final video */}
-                <span className="text-white text-sm opacity-70">Resultado visualizado aquí...</span>
-              </div>
+              <video 
+                src={downloadUrl || videoUrl || undefined} // <-- CORREGIDO: Llenamos con undefined si no hay URLs válidas
+                controls 
+                autoPlay
+                className="w-full h-full object-contain bg-black"
+              />
             ) : isProcessing ? (
               <div className="text-center">
                 <Loader className="w-10 h-10 text-indigo-400 animate-spin mx-auto mb-3" />
@@ -164,15 +180,23 @@ const VideoDetection = () => {
         </div>
       </div>
       
-      {/* Information and Results (Placeholder) */}
+      {/* Information and Results */}
       <div className="bg-white rounded-lg shadow-md p-6 mt-6 border border-gray-100">
         <h4 className="text-lg font-semibold text-gray-700 flex items-center mb-3">
           <AlertTriangle className="w-5 h-5 mr-2 text-indigo-500" />
           Información y Resultado
         </h4>
         <hr className="mb-4 border-gray-200" />
-        <div className="bg-gray-50 p-4 rounded-md min-h-[100px] flex items-center justify-center text-gray-500 text-sm">
-          Los resultados del análisis de comportamiento sospechoso aparecerán aquí.
+        <div className="bg-gray-50 p-4 rounded-md min-h-[100px] flex items-start text-gray-700 text-sm overflow-auto">
+          {analysisResults ? (
+            <pre className="whitespace-pre-wrap font-mono text-xs w-full">
+              {JSON.stringify(analysisResults, null, 2)}
+            </pre>
+          ) : (
+            <span className="flex items-center justify-center w-full h-full text-gray-500 italic">
+              Los resultados del análisis de comportamiento sospechoso aparecerán aquí.
+            </span>
+          )}
         </div>
       </div>
     </div>

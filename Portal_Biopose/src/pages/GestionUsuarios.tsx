@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit2, Trash2, X, Save } from 'lucide-react';
+import { Edit2, Trash2, X, Save, Plus } from 'lucide-react';
 import { useGestionUsuarios } from '../hooks/useGestionUsuarios';
 
 const GestionUsuarios = () => {
@@ -7,11 +7,15 @@ const GestionUsuarios = () => {
     users,
     isEditModalOpen,
     isDeleteModalOpen,
+    isCreateModalOpen,
     selectedUser, setSelectedUser,
+    newUser, setNewUser,
     handleEditClick,
     handleDeleteClick,
+    handleCreateClick,
     closeModals,
     handleSaveUser,
+    handleCreateUser,
     confirmDelete
   } = useGestionUsuarios();
 
@@ -19,6 +23,13 @@ const GestionUsuarios = () => {
     <div className="p-8">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-800">Gestión de usuarios</h1>
+        <button 
+          onClick={handleCreateClick}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+        >
+          <Plus size={20} />
+          <span>Crear Usuario</span>
+        </button>
       </div>
 
       <div className="overflow-x-auto bg-white rounded-lg shadow">
@@ -82,7 +93,93 @@ const GestionUsuarios = () => {
         </table>
       </div>
 
-      {/* Edit Modal */}
+      {/* Modal Crear Usuario */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
+            <button
+              onClick={closeModals}
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+            >
+              <X size={20} />
+            </button>
+            <h2 className="text-xl font-bold mb-4">Crear Nuevo Usuario</h2>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Identificación (Cédula)</label>
+                <input
+                  type="text"
+                  value={newUser.identificacion}
+                  onChange={(e) => setNewUser({ ...newUser, identificacion: e.target.value })}
+                  className="mt-1 w-full p-2 border rounded-md"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Nombre Completo</label>
+                <input
+                  type="text"
+                  value={newUser.fullName}
+                  onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })}
+                  className="mt-1 w-full p-2 border rounded-md"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Correo electrónico</label>
+                <input
+                  type="email"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                  className="mt-1 w-full p-2 border rounded-md"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Contraseña temporal</label>
+                <input
+                  type="password"
+                  value={newUser.password}
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                  className="mt-1 w-full p-2 border rounded-md"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Rol</label>
+                <select
+                  value={newUser.idRol}
+                  onChange={(e) => setNewUser({ ...newUser, idRol: e.target.value })}
+                  className="mt-1 w-full p-2 border rounded-md"
+                >
+                  <option value="1">Administrador</option>
+                  <option value="2">Visitante</option>
+                  
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={closeModals}
+                className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreateUser}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center space-x-2"
+              >
+                <Save size={18} />
+                <span>Crear Usuario</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar Usuario */}
       {isEditModalOpen && selectedUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
@@ -104,6 +201,7 @@ const GestionUsuarios = () => {
                     setSelectedUser({ ...selectedUser, identification: e.target.value })
                   }
                   className="mt-1 w-full p-2 border rounded-md"
+                  disabled // Usualmente la cédula no se edita, pero puedes quitar esto si tu backend lo permite
                 />
               </div>
 
@@ -180,7 +278,7 @@ const GestionUsuarios = () => {
         </div>
       )}
 
-      {/* Delete Modal */}
+      {/* Modal Eliminar Usuario */}
       {isDeleteModalOpen && selectedUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-sm p-6 text-center relative">

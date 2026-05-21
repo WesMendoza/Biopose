@@ -2,7 +2,8 @@ import { NavLink } from 'react-router-dom';
 import { 
   Home, Users, ChevronDown, ChevronRight,
   FolderOpen, Image as ImageIcon, Film,
-  UserCheck, Video, LogOut, Menu, X
+  UserCheck, Video, LogOut, Menu, X,
+  Building2, Shield // <-- Nuevos íconos importados
 } from 'lucide-react';
 import { useSidebar } from '../hooks/useSidebar';
 
@@ -49,10 +50,22 @@ const Sidebar = () => {
             {isSidebarOpen && <span>Home</span>}
           </NavLink>
 
+          {/* Sección de Administración */}
           <NavLink to="/users" className={navLinkClass} title="Gestión de Usuarios">
             <Users className="w-5 h-5 flex-shrink-0" />
             {isSidebarOpen && <span>Gestión de Usuarios</span>}
           </NavLink>
+
+          <NavLink to="/gestion-empresas" className={navLinkClass} title="Gestión de Empresas">
+            <Building2 className="w-5 h-5 flex-shrink-0" />
+            {isSidebarOpen && <span>Gestión de Empresas</span>}
+          </NavLink>
+
+          <NavLink to="/gestion-roles" className={navLinkClass} title="Gestión de Roles">
+            <Shield className="w-5 h-5 flex-shrink-0" />
+            {isSidebarOpen && <span>Gestión de Roles</span>}
+          </NavLink>
+          
 
           {/* Pose Estimation Section */}
           <div>
