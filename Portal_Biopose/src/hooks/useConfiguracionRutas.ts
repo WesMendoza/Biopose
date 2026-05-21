@@ -1,27 +1,38 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { RouteItem } from '../interface/RouteItem';
 
-
-
 export const useConfiguracionRutas = () => {
-  const [mainPath, setMainPath] = useState('');
-  const [fps, setFps] = useState<number | ''>('');
+  // Inicializamos leyendo de localStorage o valores por defecto
+  const [mainPath, setMainPath] = useState(() => localStorage.getItem('biopose_mainPath') || '');
+  const [fps, setFps] = useState<number | ''>(() => {
+    const saved = localStorage.getItem('biopose_fps');
+    return saved ? Number(saved) : '';
+  });
+  
   const [isEditingFps, setIsEditingFps] = useState(false);
-  const [routes, setRoutes] = useState<RouteItem[]>([
-    { id: 1, directory: '/videos/test1', createdAt: '2023-10-01' },
-    { id: 2, directory: '/videos/training', createdAt: '2023-10-05' },
-  ]);
+  const [routes, setRoutes] = useState<RouteItem[]>(() => {
+    const saved = localStorage.getItem('biopose_routes');
+    return saved ? JSON.parse(saved) : [
+      { id: 1, directory: '/videos/test1', createdAt: '2023-10-01' }
+    ];
+  });
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [selectedRoute, setSelectedRoute] = useState<RouteItem | null>(null);
 
+  // Efectos para guardar automáticamente en localStorage cuando cambian
+  useEffect(() => { localStorage.setItem('biopose_routes', JSON.stringify(routes)); }, [routes]);
+  useEffect(() => { localStorage.setItem('biopose_mainPath', mainPath); }, [mainPath]);
+
   const handleSaveMainPath = () => {
+    localStorage.setItem('biopose_mainPath', mainPath);
     alert(`Ruta principal guardada: ${mainPath}`);
   };
 
   const handleSaveFps = () => {
+    if (fps !== '') localStorage.setItem('biopose_fps', String(fps));
     setIsEditingFps(false);
     alert(`FPS guardado: ${fps}`);
   };
@@ -55,9 +66,6 @@ export const useConfiguracionRutas = () => {
     isDeleteModalOpen, setIsDeleteModalOpen,
     newFolderName, setNewFolderName,
     selectedRoute, setSelectedRoute,
-    handleSaveMainPath,
-    handleSaveFps,
-    handleCreateFolder,
-    handleDeleteRoute
+    handleSaveMainPath, handleSaveFps, handleCreateFolder, handleDeleteRoute
   };
 };

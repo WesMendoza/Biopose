@@ -1,5 +1,8 @@
-import React from 'react';
-import { Upload, Settings, RefreshCw, CheckCircle, AlertTriangle, CloudUpload, Loader, Image as ImageIcon, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+  Upload, Settings, RefreshCw, CheckCircle, AlertTriangle, 
+  CloudUpload, Loader, Image as ImageIcon, X, ChevronLeft, ChevronRight, Download 
+} from 'lucide-react';
 import { useGenerarImagenes } from '../hooks/useGenerarImagenes';
 
 const GenerarImagenes = () => {
@@ -11,10 +14,42 @@ const GenerarImagenes = () => {
     height, setHeight,
     isProcessing,
     isModalOpen, setIsModalOpen,
+    generatedFrames,  // <-- Nuevo estado importado
+    resultsData,      // <-- Nuevo estado importado
     fileInputRef,
     handleFileChange,
-    handleGenerateImages
+    handleGenerateImages,
+    handleReuploadClick
   } = useGenerarImagenes();
+
+  // Estados locales para navegar por la galería de fotogramas
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Reiniciar el índice si se generan nuevos frames
+  useEffect(() => {
+    if (generatedFrames && generatedFrames.length > 0) {
+      setCurrentIndex(0);
+    }
+  }, [generatedFrames]);
+
+  const handleNext = () => {
+    if (currentIndex < generatedFrames.length - 1) setCurrentIndex(prev => prev + 1);
+  };
+
+  const handlePrev = () => {
+    if (currentIndex > 0) setCurrentIndex(prev => prev - 1);
+  };
+
+  // Función para descargar el fotograma actual
+  const handleDownloadFrame = () => {
+    if (generatedFrames && generatedFrames.length > 0) {
+      const currentFrame = generatedFrames[currentIndex];
+      const link = document.createElement('a');
+      link.href = `data:image/jpeg;base64,${currentFrame.frame_base64}`;
+      link.download = `frame_${currentFrame.frame_index}_${currentFrame.timestamp_sec}s.jpg`;
+      link.click();
+    }
+  };
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -87,10 +122,17 @@ const GenerarImagenes = () => {
 
         {/* Upload Panel */}
         <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100 flex flex-col">
-          <h4 className="text-lg font-semibold text-gray-700 flex items-center mb-4">
-            <CloudUpload className="w-5 h-5 mr-2 text-indigo-500" />
-            Carga de Video
-          </h4>
+          <div className="flex justify-between items-center mb-4">
+            <h4 className="text-lg font-semibold text-gray-700 flex items-center">
+              <CloudUpload className="w-5 h-5 mr-2 text-indigo-500" />
+              Carga de Video
+            </h4>
+            {videoUrl && (
+              <button onClick={handleReuploadClick} className="text-sm text-gray-500 hover:text-indigo-600 flex items-center">
+                <RefreshCw className="w-4 h-4 mr-1" /> Nuevo video
+              </button>
+            )}
+          </div>
           <hr className="mb-4 border-gray-200" />
           
           <div className="flex-grow flex flex-col justify-center items-center">
@@ -123,69 +165,107 @@ const GenerarImagenes = () => {
               <button
                 onClick={handleGenerateImages}
                 disabled={isProcessing}
-                className="mt-6 w-full flex justify-center items-center px-4 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium"
+                className="mt-6 w-full flex justify-center items-center px-4 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium disabled:opacity-50"
               >
                 {isProcessing ? (
                   <Loader className="w-5 h-5 mr-2 animate-spin" />
                 ) : (
                   <ImageIcon className="w-5 h-5 mr-2" />
                 )}
-                Obtener Imágenes
+                {isProcessing ? 'Procesando...' : 'Obtener Imágenes'}
               </button>
             )}
 
             <div className="flex items-center mt-4 w-full text-amber-700 text-xs px-3 py-2 bg-amber-50 rounded border border-amber-200">
               <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" />
-              <span><strong>Importante:</strong> Todos tus videos serán recortados hasta 30 segundos</span>
+              <span><strong>Importante:</strong> Todos tus videos serán procesados según los FPS indicados.</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Image Generated Modal */}
+      {/* Image Generated Modal (Galería de Fotogramas) */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl flex flex-col max-h-[90vh]">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-800">Imagen Procesada</h2>
+              <h2 className="text-xl font-bold text-gray-800">Fotogramas Extraídos</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-gray-700">
                 <X className="w-6 h-6" />
               </button>
             </div>
             
             <div className="p-6 flex-grow overflow-y-auto flex flex-col lg:flex-row gap-6">
-              <div className="lg:w-1/2 flex items-center justify-center bg-gray-100 rounded-md min-h-[300px] border border-gray-200">
-                <p className="text-gray-400">Previsualización de Imagen con Keypoints...</p>
+              {/* Visor de imágenes */}
+              <div className="lg:w-2/3 flex flex-col items-center justify-center bg-gray-900 rounded-md min-h-[400px] border border-gray-200 relative overflow-hidden">
+                {generatedFrames && generatedFrames.length > 0 ? (
+                  <>
+                    <img 
+                      src={`data:image/jpeg;base64,${generatedFrames[currentIndex].frame_base64}`} 
+                      alt={`Frame ${generatedFrames[currentIndex].frame_index}`}
+                      className="w-full h-full object-contain"
+                    />
+                    
+                    {/* Botones de navegación */}
+                    <button 
+                      onClick={handlePrev} 
+                      disabled={currentIndex === 0} 
+                      className="absolute left-4 p-3 bg-white/20 text-white rounded-full hover:bg-white/40 disabled:opacity-20 transition-all"
+                    >
+                      <ChevronLeft className="w-6 h-6" />
+                    </button>
+                    
+                    <button 
+                      onClick={handleNext} 
+                      disabled={currentIndex === generatedFrames.length - 1} 
+                      className="absolute right-4 p-3 bg-white/20 text-white rounded-full hover:bg-white/40 disabled:opacity-20 transition-all"
+                    >
+                      <ChevronRight className="w-6 h-6" />
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-gray-400">No se pudieron generar los fotogramas.</p>
+                )}
               </div>
               
-              <div className="lg:w-1/2 flex flex-col">
-                <h3 className="font-semibold text-gray-700 mb-4">Puntos generados:</h3>
+              {/* Panel de información */}
+              <div className="lg:w-1/3 flex flex-col">
+                <h3 className="font-semibold text-gray-700 mb-4">Detalles de Extracción</h3>
                 
-                <div className="grid grid-cols-3 gap-2 flex-grow mb-6">
-                  {/* Example Keypoints layout matching the original HTML cards */}
-                  <div className="flex flex-col gap-2">
-                    {[2, 4, 6, 8, 10, 12].map(num => (
-                      <div key={num} className="bg-blue-50 text-blue-700 text-center py-2 rounded font-medium text-sm border border-blue-100">Point {num}</div>
-                    ))}
+                {resultsData && (
+                  <div className="bg-blue-50 border border-blue-100 p-4 rounded-md mb-6">
+                    <p className="text-sm text-blue-800 mb-2"><strong>Total fotogramas:</strong> {resultsData.total_frames}</p>
+                    <p className="text-sm text-blue-800 mb-2"><strong>FPS Solicitados:</strong> {fps}</p>
+                    <p className="text-sm text-blue-800"><strong>Duración:</strong> {resultsData.duration} segundos</p>
                   </div>
-                  <div className="flex flex-col justify-center gap-2">
-                    {[1, 14].map(num => (
-                      <div key={num} className="bg-indigo-50 text-indigo-700 text-center py-2 rounded font-medium text-sm border border-indigo-100">Point {num}</div>
-                    ))}
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {[3, 5, 7, 9, 11, 13].map(num => (
-                      <div key={num} className="bg-green-50 text-green-700 text-center py-2 rounded font-medium text-sm border border-green-100">Point {num}</div>
-                    ))}
-                  </div>
-                </div>
+                )}
 
-                <div className="flex flex-col sm:flex-row gap-3 mt-auto">
-                  <button className="flex-1 py-2 border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 rounded-md font-medium transition-colors">
-                    Omitir Imagen
+                {generatedFrames && generatedFrames.length > 0 && (
+                  <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-md">
+                    <p className="text-sm text-gray-700 mb-2 font-semibold">Fotograma Actual:</p>
+                    <p className="text-sm text-gray-600 mb-1">
+                      <strong>N°:</strong> {currentIndex + 1} de {generatedFrames.length}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      <strong>Marca de tiempo:</strong> {generatedFrames[currentIndex].timestamp_sec}s
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-3 mt-auto">
+                  <button 
+                    onClick={handleDownloadFrame}
+                    disabled={!generatedFrames || generatedFrames.length === 0}
+                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm"
+                  >
+                    <Download className="w-5 h-5" /> Guardar Fotograma
                   </button>
-                  <button className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-medium transition-colors">
-                    Guardar Imagen
+                  
+                  <button 
+                    onClick={() => setIsModalOpen(false)}
+                    className="w-full py-3 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md font-medium transition-colors"
+                  >
+                    Cerrar Galería
                   </button>
                 </div>
               </div>
