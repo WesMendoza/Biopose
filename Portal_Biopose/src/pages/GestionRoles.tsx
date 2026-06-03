@@ -1,5 +1,4 @@
-import React from 'react';
-import { Edit2, Trash2, X, Save, Plus } from 'lucide-react';
+import { Edit2, Plus, Save, Trash2, X } from 'lucide-react';
 import { useRoles } from '../hooks/useRoles';
 
 const GestionRoles = () => {
@@ -30,17 +29,15 @@ const GestionRoles = () => {
             <tr className="bg-gray-100 border-b">
               <th className="p-4 text-sm font-semibold text-gray-600">Id</th>
               <th className="p-4 text-sm font-semibold text-gray-600">Nombre del Rol</th>
-              <th className="p-4 text-sm font-semibold text-gray-600">Descripción</th>
               <th className="p-4 text-sm font-semibold text-gray-600 text-center">Acciones</th>
             </tr>
           </thead>
           <tbody>
-            {loading ? <tr><td colSpan={4} className="p-4 text-center">Cargando...</td></tr> : null}
+            {loading ? <tr><td colSpan={3} className="p-4 text-center">Cargando...</td></tr> : null}
             {!loading && roles.map((rol) => (
               <tr key={rol.idRol} className="border-b hover:bg-gray-50">
                 <td className="p-4 text-sm text-gray-700">{rol.idRol}</td>
                 <td className="p-4 text-sm text-gray-700 font-medium">{rol.nombre}</td>
-                <td className="p-4 text-sm text-gray-700">{rol.descripcion}</td>
                 <td className="p-4 flex justify-center space-x-2">
                   <button onClick={() => handleEditClick(rol)} className="p-1 text-blue-600 hover:bg-blue-100 rounded">
                     <Edit2 size={18} />
@@ -63,7 +60,6 @@ const GestionRoles = () => {
             <h2 className="text-xl font-bold mb-4">Crear Rol</h2>
             <div className="space-y-4">
               <input type="text" placeholder="Nombre (Ej: Administrador)" value={nuevoRol.nombre} onChange={(e) => setNuevoRol({ ...nuevoRol, nombre: e.target.value })} className="w-full p-2 border rounded-md" />
-              <textarea placeholder="Descripción del rol..." value={nuevoRol.descripcion} onChange={(e) => setNuevoRol({ ...nuevoRol, descripcion: e.target.value })} className="w-full p-2 border rounded-md" rows={3} />
             </div>
             <div className="mt-6 flex justify-end space-x-3">
               <button onClick={closeModals} className="px-4 py-2 border rounded-md">Cancelar</button>
@@ -81,7 +77,6 @@ const GestionRoles = () => {
             <h2 className="text-xl font-bold mb-4">Editar Rol</h2>
             <div className="space-y-4">
               <input type="text" value={selectedRol.nombre} onChange={(e) => setSelectedRol({ ...selectedRol, nombre: e.target.value })} className="w-full p-2 border rounded-md" />
-              <textarea value={selectedRol.descripcion} onChange={(e) => setSelectedRol({ ...selectedRol, descripcion: e.target.value })} className="w-full p-2 border rounded-md" rows={3} />
             </div>
             <div className="mt-6 flex justify-end space-x-3">
               <button onClick={closeModals} className="px-4 py-2 border rounded-md">Cancelar</button>

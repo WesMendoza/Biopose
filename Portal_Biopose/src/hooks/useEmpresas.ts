@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import api from '../lib/api';
 
 export interface Empresa {
   idEmpresa?: number;
-  nombre: string;
+  codigoEmpresa?: string;
+  nombreEmpresa: string;
   ruc: string;
   direccion?: string;
-  telefono?: string;
   estado?: string;
 }
 
@@ -19,12 +19,12 @@ export const useEmpresas = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   
   const [selectedEmpresa, setSelectedEmpresa] = useState<Empresa | null>(null);
-  const [nuevaEmpresa, setNuevaEmpresa] = useState<Empresa>({ nombre: '', ruc: '', direccion: '', telefono: '' });
+  const [nuevaEmpresa, setNuevaEmpresa] = useState<Empresa>({ nombreEmpresa: '', ruc: '', direccion: '' });
 
   const fetchEmpresas = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get('/api/gestion-empresas/empresas/');
+      const res = await api.get('/api/gestionEmpresas/empresas/');
       setEmpresas(res?.detalle || res || []);
     } catch (error) {
       console.error("Error cargando empresas", error);
@@ -38,7 +38,7 @@ export const useEmpresas = () => {
   }, [fetchEmpresas]);
 
   const handleCreateClick = () => {
-    setNuevaEmpresa({ nombre: '', ruc: '', direccion: '', telefono: '' });
+    setNuevaEmpresa({ nombreEmpresa: '', ruc: '', direccion: '' });
     setIsCreateModalOpen(true);
   };
 
@@ -61,7 +61,11 @@ export const useEmpresas = () => {
 
   const handleCreateEmpresa = async () => {
     try {
-      await api.post('/api/gestion-empresas/empresas/', nuevaEmpresa);
+      await api.post('/api/gestionEmpresas/empresas/', {
+        nombreEmpresa: nuevaEmpresa.nombreEmpresa,
+        ruc: nuevaEmpresa.ruc,
+        direccion: nuevaEmpresa.direccion
+      });
       await fetchEmpresas();
       closeModals();
     } catch (err: any) {
@@ -70,9 +74,9 @@ export const useEmpresas = () => {
   };
 
   const handleSaveEmpresa = async () => {
-    if (selectedEmpresa?.idEmpresa) {
+    if (selectedEmpresa?.codigoEmpresa) {
       try {
-        await api.patch(`/api/gestion-empresas/empresas/${selectedEmpresa.idEmpresa}/`, selectedEmpresa);
+        await api.patch(`/api/gestionEmpresas/empresas/${selectedEmpresa.codigoEmpresa}/`, selectedEmpresa);
         await fetchEmpresas();
         closeModals();
       } catch (err: any) {
@@ -82,10 +86,10 @@ export const useEmpresas = () => {
   };
 
   const confirmDelete = async () => {
-    if (selectedEmpresa?.idEmpresa) {
+    if (selectedEmpresa?.codigoEmpresa) {
       try {
-        await api.del(`/api/gestion-empresas/empresas/${selectedEmpresa.idEmpresa}/`);
-        setEmpresas(empresas.filter(e => e.idEmpresa !== selectedEmpresa.idEmpresa));
+        await api.del(`/api/gestionEmpresas/empresas/${selectedEmpresa.codigoEmpresa}/`);
+        setEmpresas(empresas.filter(e => e.codigoEmpresa !== selectedEmpresa.codigoEmpresa));
         closeModals();
       } catch (err: any) {
         alert(err?.response?.mensaje || 'Error eliminando la empresa');

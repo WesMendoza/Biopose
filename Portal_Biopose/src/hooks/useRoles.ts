@@ -1,10 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import api from '../lib/api';
 
 export interface Rol {
   idRol?: number;
   nombre: string;
-  descripcion?: string;
   estado?: string;
 }
 
@@ -17,13 +16,19 @@ export const useRoles = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   
   const [selectedRol, setSelectedRol] = useState<Rol | null>(null);
-  const [nuevoRol, setNuevoRol] = useState<Rol>({ nombre: '', descripcion: '' });
+  const [nuevoRol, setNuevoRol] = useState<Rol>({ nombre: '' });
 
   const fetchRoles = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get('/api/gestion-empresas/roles/');
-      setRoles(res?.detalle || res || []);
+      const res = await api.get('/api/gestionEmpresas/roles/');
+      const backendRoles = res?.detalle || res || [];
+      const mappedRoles: Rol[] = backendRoles.map((rol: any) => ({
+        idRol: rol.idRol,
+        nombre: rol.nombreRol || rol.nombre || '',
+        estado: rol.estado || '',
+      }));
+      setRoles(mappedRoles);
     } catch (error) {
       console.error("Error cargando roles", error);
     } finally {
@@ -36,7 +41,7 @@ export const useRoles = () => {
   }, [fetchRoles]);
 
   const handleCreateClick = () => {
-    setNuevoRol({ nombre: '', descripcion: '' });
+    setNuevoRol({ nombre: '' });
     setIsCreateModalOpen(true);
   };
 
@@ -59,7 +64,9 @@ export const useRoles = () => {
 
   const handleCreateRol = async () => {
     try {
-      await api.post('/api/gestion-empresas/roles/', nuevoRol);
+      await api.post('/api/gestionEmpresas/roles/', {
+        nombreRol: nuevoRol.nombre,
+      });
       await fetchRoles();
       closeModals();
     } catch (err: any) {
@@ -70,7 +77,9 @@ export const useRoles = () => {
   const handleSaveRol = async () => {
     if (selectedRol?.idRol) {
       try {
-        await api.patch(`/api/gestion-empresas/roles/${selectedRol.idRol}/`, selectedRol);
+        await api.patch(`/api/gestionEmpresas/roles/${selectedRol.idRol}/`, {
+          nombreRol: selectedRol.nombre,
+        });
         await fetchRoles();
         closeModals();
       } catch (err: any) {
@@ -82,7 +91,7 @@ export const useRoles = () => {
   const confirmDelete = async () => {
     if (selectedRol?.idRol) {
       try {
-        await api.del(`/api/gestion-empresas/roles/${selectedRol.idRol}/`);
+        await api.del(`/api/gestionEmpresas/roles/${selectedRol.idRol}/`);
         setRoles(roles.filter(r => r.idRol !== selectedRol.idRol));
         closeModals();
       } catch (err: any) {

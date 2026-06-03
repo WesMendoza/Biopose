@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import api from '../lib/api';
+import { useEffect, useState } from 'react';
 import type { User } from '../interface/User';
+import api from '../lib/api';
 
 export const useGestionUsuarios = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -11,6 +11,7 @@ export const useGestionUsuarios = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [roles, setRoles] = useState<{ idRol: number; nombreRol: string }[]>([]);
   
 // Estado para el nuevo usuario
   const [newUser, setNewUser] = useState({
@@ -18,8 +19,8 @@ export const useGestionUsuarios = () => {
     fullName: '',
     email: '',
     password: '',
-    idRol: '',      // <-- Nuevo: guardará el ID numérico del rol
-    idEmpresa: ''   // <-- Nuevo: guardará el ID numérico de la empresa
+    idRol: '',      // en el backend se espera un id numérico de rol
+    idEmpresa: ''   // opcional si el usuario administrador tiene una empresa asignada
   });
 
   const handleEditClick = (user: User) => {
@@ -47,9 +48,9 @@ export const useGestionUsuarios = () => {
  // POST: Crear usuario y asignarle Rol/Empresa
   const handleCreateUser = async () => {
     try {
-      // Validamos que haya seleccionado un rol y empresa
-      if (!newUser.idRol || !newUser.idEmpresa) {
-        alert("Por favor seleccione un Rol y una Empresa");
+      // Validamos que haya seleccionado un rol
+      if (!newUser.idRol) {
+        alert("Por favor seleccione un Rol");
         return;
       }
 
@@ -67,12 +68,15 @@ export const useGestionUsuarios = () => {
 
       // PASO 2: Asignar Rol y Empresa en la tabla pivote
       if (newId) {
-        await api.post('/api/gestion-empresas/asignar-usuario-rol/', {
+        const assignPayload: any = {
           idUsuario: newId,
-          idEmpresa: Number(newUser.idEmpresa),
           idRol: Number(newUser.idRol),
           estado: 'A'
-        });
+        };
+        if (newUser.idEmpresa) {
+          assignPayload.idEmpresa = Number(newUser.idEmpresa);
+        }
+        await api.post('/api/gestionEmpresas/asignarUsuarioRol/', assignPayload);
       }
       
       // Actualizamos la tabla local
@@ -81,7 +85,8 @@ export const useGestionUsuarios = () => {
         fullName: newUser.fullName,
         identification: newUser.identificacion,
         email: newUser.email,
-        role: newUser.idRol, // Temporalmente mostramos el ID o puedes buscar el nombre si lo pasas
+        idRol: newUser.idRol,
+        role: roles.find((rol) => String(rol.idRol) === String(newUser.idRol))?.nombreRol || newUser.idRol,
         isActive: true
       }]);
       
@@ -102,21 +107,14 @@ export const useGestionUsuarios = () => {
           correo: selectedUser.email,
         };
 
-        await api.patch(`/api/users/actualizar-por-cedula/${selectedUser.identification}/`, payloadUser);
+        await api.patch(`/api/users/actualizarPorCedula/${selectedUser.identification}/`, payloadUser);
         
-        // 2. Actualizar el Rol y Empresa (Opcional, si tu modal permite cambiarlos)
-        // Nota: Asumiendo que selectedUser ahora tiene idRol e idEmpresa
-        if (selectedUser.idRol && selectedUser.idEmpresa) {
-           // Aquí dependerá de si tu backend espera un PUT o PATCH al ID del pivote, 
-           // o si tiene un endpoint custom como el de la cédula.
-           // Ejemplo de cómo se vería si el backend lo permite por POST de actualización:
-           /*
-           await api.post('/api/gestion-empresas/asignar-usuario-rol/actualizar/', {
-             idUsuario: selectedUser.id,
-             idEmpresa: Number(selectedUser.idEmpresa),
-             idRol: Number(selectedUser.idRol)
-           });
-           */
+        // 2. Actualizar el Rol del usuario si se cambió
+        if (selectedUser.idRol) {
+          await api.put('/api/gestionEmpresas/asignarUsuarioRol/reasignar/', {
+            idUsuario: selectedUser.id,
+            idRol: Number(selectedUser.idRol)
+          });
         }
 
         setUsers(users.map((u) => (u.id === selectedUser.id ? selectedUser : u)));
@@ -153,7 +151,8 @@ export const useGestionUsuarios = () => {
           fullName: `${u.nombre || ''} ${u.apellido || ''}`.trim(),
           identification: u.cedula || u.identificacion || '',
           email: u.correo || u.email || '',
-          role: u.idRol ? String(u.idRol) : 'N/A',
+          idRol: u.idRol ?? undefined,
+          role: u.role || (u.idRol ? String(u.idRol) : 'N/A'),
           isActive: (u.estado || 'A') === 'A'
         }));
         setUsers(mapped);
@@ -163,8 +162,24 @@ export const useGestionUsuarios = () => {
       });
   }, []);
 
+  useEffect(() => {
+    api.get('/api/gestionEmpresas/roles/')
+      .then((res) => {
+        const list = res?.detalle || res || [];
+        const mappedRoles = list.map((r: any) => ({
+          idRol: r.idRol,
+          nombreRol: r.nombreRol || r.nombre || `Rol ${r.idRol}`
+        }));
+        setRoles(mappedRoles);
+      })
+      .catch(() => {
+        setRoles([]);
+      });
+  }, []);
+
   return {
     users,
+    roles,
     isEditModalOpen,
     isDeleteModalOpen,
     isCreateModalOpen,

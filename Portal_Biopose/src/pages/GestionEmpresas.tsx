@@ -1,5 +1,4 @@
-import React from 'react';
-import { Edit2, Trash2, X, Save, Plus } from 'lucide-react';
+import { Edit2, Plus, Save, Trash2, X } from 'lucide-react';
 import { useEmpresas } from '../hooks/useEmpresas';
 
 const GestionEmpresas = () => {
@@ -29,6 +28,7 @@ const GestionEmpresas = () => {
           <thead>
             <tr className="bg-gray-100 border-b">
               <th className="p-4 text-sm font-semibold text-gray-600">Id</th>
+              <th className="p-4 text-sm font-semibold text-gray-600">Código</th>
               <th className="p-4 text-sm font-semibold text-gray-600">Nombre</th>
               <th className="p-4 text-sm font-semibold text-gray-600">RUC</th>
               <th className="p-4 text-sm font-semibold text-gray-600">Dirección</th>
@@ -36,11 +36,12 @@ const GestionEmpresas = () => {
             </tr>
           </thead>
           <tbody>
-            {loading ? <tr><td colSpan={5} className="p-4 text-center">Cargando...</td></tr> : null}
+            {loading ? <tr><td colSpan={6} className="p-4 text-center">Cargando...</td></tr> : null}
             {!loading && empresas.map((empresa) => (
-              <tr key={empresa.idEmpresa} className="border-b hover:bg-gray-50">
+              <tr key={empresa.codigoEmpresa || empresa.idEmpresa} className="border-b hover:bg-gray-50">
                 <td className="p-4 text-sm text-gray-700">{empresa.idEmpresa}</td>
-                <td className="p-4 text-sm text-gray-700">{empresa.nombre}</td>
+                <td className="p-4 text-sm text-gray-700">{empresa.codigoEmpresa}</td>
+                <td className="p-4 text-sm text-gray-700">{empresa.nombreEmpresa}</td>
                 <td className="p-4 text-sm text-gray-700">{empresa.ruc}</td>
                 <td className="p-4 text-sm text-gray-700">{empresa.direccion}</td>
                 <td className="p-4 flex justify-center space-x-2">
@@ -64,7 +65,7 @@ const GestionEmpresas = () => {
             <button onClick={closeModals} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"><X size={20} /></button>
             <h2 className="text-xl font-bold mb-4">Crear Empresa</h2>
             <div className="space-y-4">
-              <input type="text" placeholder="Nombre" value={nuevaEmpresa.nombre} onChange={(e) => setNuevaEmpresa({ ...nuevaEmpresa, nombre: e.target.value })} className="w-full p-2 border rounded-md" />
+              <input type="text" placeholder="Nombre" value={nuevaEmpresa.nombreEmpresa} onChange={(e) => setNuevaEmpresa({ ...nuevaEmpresa, nombreEmpresa: e.target.value })} className="w-full p-2 border rounded-md" />
               <input type="text" placeholder="RUC" value={nuevaEmpresa.ruc} onChange={(e) => setNuevaEmpresa({ ...nuevaEmpresa, ruc: e.target.value })} className="w-full p-2 border rounded-md" />
               <input type="text" placeholder="Dirección" value={nuevaEmpresa.direccion} onChange={(e) => setNuevaEmpresa({ ...nuevaEmpresa, direccion: e.target.value })} className="w-full p-2 border rounded-md" />
             </div>
@@ -83,7 +84,7 @@ const GestionEmpresas = () => {
             <button onClick={closeModals} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"><X size={20} /></button>
             <h2 className="text-xl font-bold mb-4">Editar Empresa</h2>
             <div className="space-y-4">
-              <input type="text" value={selectedEmpresa.nombre} onChange={(e) => setSelectedEmpresa({ ...selectedEmpresa, nombre: e.target.value })} className="w-full p-2 border rounded-md" />
+              <input type="text" value={selectedEmpresa.nombreEmpresa} onChange={(e) => setSelectedEmpresa({ ...selectedEmpresa, nombreEmpresa: e.target.value })} className="w-full p-2 border rounded-md" />
               <input type="text" value={selectedEmpresa.ruc} onChange={(e) => setSelectedEmpresa({ ...selectedEmpresa, ruc: e.target.value })} className="w-full p-2 border rounded-md" />
               <input type="text" value={selectedEmpresa.direccion} onChange={(e) => setSelectedEmpresa({ ...selectedEmpresa, direccion: e.target.value })} className="w-full p-2 border rounded-md" />
             </div>

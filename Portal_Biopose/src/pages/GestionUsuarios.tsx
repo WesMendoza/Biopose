@@ -1,10 +1,10 @@
-import React from 'react';
-import { Edit2, Trash2, X, Save, Plus } from 'lucide-react';
+import { Edit2, Plus, Save, Trash2, X } from 'lucide-react';
 import { useGestionUsuarios } from '../hooks/useGestionUsuarios';
 
 const GestionUsuarios = () => {
   const {
     users,
+    roles,
     isEditModalOpen,
     isDeleteModalOpen,
     isCreateModalOpen,
@@ -153,9 +153,12 @@ const GestionUsuarios = () => {
                   onChange={(e) => setNewUser({ ...newUser, idRol: e.target.value })}
                   className="mt-1 w-full p-2 border rounded-md"
                 >
-                  <option value="1">Administrador</option>
-                  <option value="2">Visitante</option>
-                  
+                  <option value="">Seleccione un rol</option>
+                  {roles.map((rol) => (
+                    <option key={rol.idRol} value={rol.idRol}>
+                      {rol.nombreRol}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -233,14 +236,22 @@ const GestionUsuarios = () => {
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-700">Rol</label>
                   <select
-                    value={selectedUser.role}
+                    value={selectedUser.idRol ?? ''}
                     onChange={(e) =>
-                      setSelectedUser({ ...selectedUser, role: e.target.value })
+                      setSelectedUser({
+                        ...selectedUser,
+                        idRol: e.target.value,
+                        role: e.target.options[e.target.selectedIndex].text
+                      })
                     }
                     className="mt-1 w-full p-2 border rounded-md"
                   >
-                    <option value="Administrador">Administrador</option>
-                    <option value="Visitante">Visitante</option>
+                    <option value="">Seleccione un rol</option>
+                    {roles.map((rol) => (
+                      <option key={rol.idRol} value={rol.idRol}>
+                        {rol.nombreRol}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
