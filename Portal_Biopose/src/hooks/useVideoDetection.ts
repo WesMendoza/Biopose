@@ -1,6 +1,5 @@
-import { useState, useRef } from 'react';
+import { useRef, useState } from 'react';
 import api from '../lib/api';
-import { API_BASE } from '../config'; // Importamos la URL base para armar las rutas de streaming/descarga
 
 export const useVideoDetection = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -42,14 +41,14 @@ export const useVideoDetection = () => {
 
     try {
       // 1. SUBIDA DEL VIDEO
-      const resUpload = await api.postForm('/api/analysis/videos/upload/', fd);
-      const videoId = resUpload?.detalle?.id || resUpload?.id || resUpload?.video_id;
+      const resUpload = await api.postForm('/api/analysis/media/videos/upload/', fd);
+      const videoId = resUpload?.idVideoUpload || resUpload?.detalle?.idVideoUpload || resUpload?.id || resUpload?.video_id;
       
       if (!videoId) throw new Error("No se recibió el ID del video subido.");
       setProgress(30); // Subida completa
 
       // 2. INICIAR EL PROCESAMIENTO (YOLOv8)
-      await api.post(`/api/analysis/videos/${videoId}/process/`, { 
+      const resProcess = await api.post(`/api/analysis/videos/${videoId}/process/`, { 
         fps_skip: framesSkip, 
         dimension: poseMode 
       });
@@ -60,23 +59,16 @@ export const useVideoDetection = () => {
         try {
           const resStatus = await api.get(`/api/analysis/videos/${videoId}/results/`);
           
-          // Revisa la palabra exacta que devuelve tu backend (ej: 'COMPLETADO', 'PROCESADO', 'FINISHED')
-          const estadoBackend = resStatus?.estado || resStatus?.status || resStatus?.detalle?.estado;
-
-          if (estadoBackend === 'COMPLETADO' || estadoBackend === 'PROCESADO' || resStatus?.resultados) {
+          // El backend devuelve "completed" cuando termina
+          if (resStatus?.status === 'completed') {
             clearInterval(interval);
             setProgress(100);
             setIsProcessing(false);
             
             // Guardamos los resultados (JSON con métricas)
-            setAnalysisResults(resStatus?.resultados || resStatus?.detalle);
+            setAnalysisResults(resStatus);
             
-            // Armamos las URLs para Streaming y Descarga
-            // OJO: Si estos endpoints requieren token, deberás agregarlo.
-            setProcessedStreamUrl(`${API_BASE}/api/analysis/videos/${videoId}/stream/`);
-            setDownloadUrl(`${API_BASE}/api/analysis/videos/${videoId}/download/`);
-            
-          } else {
+          } else if (resStatus?.status === 'processing') {
             // Si el backend aún no termina, hacemos que la barra avance lentamente hasta el 90%
             setProgress((prev) => (prev < 90 ? prev + 5 : 90));
           }

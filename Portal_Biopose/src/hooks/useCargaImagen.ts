@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useRef, useState } from 'react';
 import api from '../lib/api';
 
 export const useCargaImagen = () => {
@@ -9,6 +9,8 @@ export const useCargaImagen = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [isPoseModalOpen, setIsPoseModalOpen] = useState(false);
+  const [poseResults, setPoseResults] = useState<any>(null);
+  const [imageId, setImageId] = useState<number | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -18,6 +20,8 @@ export const useCargaImagen = () => {
       setFile(selectedFile);
       const url = URL.createObjectURL(selectedFile);
       setImageUrl(url);
+      setPoseResults(null);
+      setImageId(null);
     }
   };
 
@@ -26,7 +30,7 @@ export const useCargaImagen = () => {
     setIsPreviewModalOpen(true);
   };
 
-  const handleGeneratePose = () => {
+  const handleGeneratePose = async () => {
     if (!file) return;
     setIsPreviewModalOpen(false);
     setIsProcessing(true);
@@ -34,18 +38,24 @@ export const useCargaImagen = () => {
     const fd = new FormData();
     fd.append('image', file);
 
-    api.postForm('/api/analysis/images/upload/', fd)
-      .then((res) => {
-        // try to extract URL from response
-        const url = res?.detalle?.url || res?.detalle?.path || null;
-        if (url) setImageUrl(url);
-        setIsPoseModalOpen(true);
-      })
-      .catch(() => {
-        // fallback to local simulated pose
-        setTimeout(() => setIsPoseModalOpen(true), 800);
-      })
-      .finally(() => setIsProcessing(false));
+    try {
+      // PASO 1: Subir imagen
+      const resUpload = await api.postForm('/api/analysis/media/images/upload/', fd);
+      const uploadedImageId = resUpload?.idImageUpload || resUpload?.detalle?.idImageUpload;
+      
+      if (!uploadedImageId) throw new Error('No se recibió ID de imagen subida');
+      setImageId(uploadedImageId);
+
+      // PASO 2: Procesar con YOLO para detectar pose
+      const resProcess = await api.post(`/api/analysis/pose/image/${uploadedImageId}/process/`, {});
+      setPoseResults(resProcess);
+      setIsPoseModalOpen(true);
+    } catch (error: any) {
+      alert(error?.response?.mensaje || 'Error al procesar la imagen');
+      console.error(error);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return {
@@ -60,6 +70,8 @@ export const useCargaImagen = () => {
     setIsPreviewModalOpen,
     isPoseModalOpen,
     setIsPoseModalOpen,
+    poseResults,
+    imageId,
     fileInputRef,
     handleFileChange,
     handleProcessClick,

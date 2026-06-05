@@ -1,5 +1,5 @@
-import React from 'react';
-import { Upload, Settings, RefreshCw, CheckCircle, AlertTriangle, CloudUpload, Loader, Image as ImageIcon, X } from 'lucide-react';
+import { CheckCircle, CloudUpload, Image as ImageIcon, Loader, Settings, X } from 'lucide-react';
+import { API_BASE } from '../config';
 import { useCargaImagen } from '../hooks/useCargaImagen';
 
 const CargaImagen = () => {
@@ -15,6 +15,7 @@ const CargaImagen = () => {
     setIsPreviewModalOpen,
     isPoseModalOpen,
     setIsPoseModalOpen,
+    poseResults,
     fileInputRef,
     handleFileChange,
     handleProcessClick,
@@ -163,7 +164,7 @@ const CargaImagen = () => {
       )}
 
       {/* Pose Generated Modal */}
-      {isPoseModalOpen && (
+      {isPoseModalOpen && poseResults && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl flex flex-col max-h-[90vh]">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center rounded-t-lg bg-gray-50">
@@ -174,47 +175,66 @@ const CargaImagen = () => {
             </div>
             
             <div className="p-6 flex-grow overflow-y-auto flex flex-col lg:flex-row gap-6">
-              <div className="lg:w-1/2 flex items-center justify-center bg-gray-100 rounded-md min-h-[300px] border border-gray-200 relative">
-                <img src={imageUrl!} alt="Resultado" className="opacity-50 max-h-full object-contain" />
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <p className="text-indigo-600 font-bold bg-white/80 px-4 py-2 rounded">Puntos generados (Simulado)</p>
-                </div>
+              {/* Imagen procesada con keypoints dibujados */}
+              <div className="lg:w-1/2 flex items-center justify-center bg-gray-100 rounded-md min-h-[300px] border border-gray-200">
+                {poseResults?.processed_image_path ? (
+                  <img 
+                    src={`${API_BASE}/media/${poseResults.processed_image_path}`}
+                    alt="Imagen Procesada" 
+                    className="max-h-full max-w-full object-contain rounded"
+                  />
+                ) : (
+                  <p className="text-gray-500">Cargando imagen procesada...</p>
+                )}
               </div>
               
+              {/* Información y keypoints reales */}
               <div className="lg:w-1/2 flex flex-col">
-                <div className="mb-4 text-center">
-                  <h2 className="text-sm text-gray-500 font-semibold mb-1">Dimensión de la imagen actual</h2>
-                  <p className="text-lg text-indigo-700 font-bold">{width} x {height}</p>
-                </div>
-                
-                <h3 className="font-semibold text-gray-700 mb-4">Puntos generados:</h3>
-                
-                <div className="grid grid-cols-3 gap-2 flex-grow mb-6">
-                  {/* Point Layout matching the original modal logic */}
-                  <div className="flex flex-col gap-2">
-                    {[2, 4, 6, 8, 10, 12].map(num => (
-                      <div key={num} className="bg-blue-50 text-blue-700 text-center py-2 rounded font-medium text-sm border border-blue-100">Punto {num}</div>
-                    ))}
-                  </div>
-                  <div className="flex flex-col justify-center gap-2">
-                    {[1, 14].map(num => (
-                      <div key={num} className="bg-indigo-50 text-indigo-700 text-center py-2 rounded font-medium text-sm border border-indigo-100">Punto {num}</div>
-                    ))}
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {[3, 5, 7, 9, 11, 13].map(num => (
-                      <div key={num} className="bg-green-50 text-green-700 text-center py-2 rounded font-medium text-sm border border-green-100">Punto {num}</div>
-                    ))}
+                <div className="mb-6">
+                  <h3 className="text-sm text-gray-500 font-semibold mb-2">Información de Detección</h3>
+                  <div className="bg-indigo-50 p-4 rounded border border-indigo-200 space-y-2 text-sm">
+                    <p><strong>Modelo:</strong> {poseResults?.model_used || 'N/A'}</p>
+                    <p><strong>Personas detectadas:</strong> {poseResults?.persons_detected || 0}</p>
+                    <p><strong>Dimensión actual:</strong> {width} x {height}</p>
                   </div>
                 </div>
 
+                {/* Keypoints reales del backend */}
+                {poseResults?.persons && poseResults.persons.length > 0 ? (
+                  <div>
+                    <h3 className="font-semibold text-gray-700 mb-4">Keypoints Detectados (Persona 1):</h3>
+                    <div className="grid grid-cols-2 gap-2 mb-6 max-h-48 overflow-y-auto">
+                      {poseResults.persons[0]?.keypoints?.map((kp: any) => (
+                        <div 
+                          key={kp.id}
+                          className="bg-blue-50 text-blue-700 p-2 rounded text-xs border border-blue-200 flex justify-between"
+                        >
+                          <span><strong>{kp.name || `Punto ${kp.id}`}</strong></span>
+                          <span className="text-gray-600">
+                            ({Math.round(kp.x)}, {Math.round(kp.y)}) 
+                            {kp.confidence && <span className="ml-1">conf: {(kp.confidence * 100).toFixed(0)}%</span>}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-yellow-50 p-4 rounded border border-yellow-200 text-sm text-yellow-700">
+                    <p>No se detectaron keypoints en la imagen.</p>
+                  </div>
+                )}
+
                 <div className="flex flex-col sm:flex-row gap-3 mt-auto">
-                  <button className="flex-1 py-2 border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 rounded-md font-medium transition-colors"
-                  onClick={() => setIsPoseModalOpen(false)}>
+                  <button 
+                    className="flex-1 py-2 border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 rounded-md font-medium transition-colors"
+                    onClick={() => setIsPoseModalOpen(false)}
+                  >
                     Descartar
                   </button>
-                  <button className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-medium transition-colors"
-                  onClick={() => setIsPoseModalOpen(false)}>
+                  <button 
+                    className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-medium transition-colors"
+                    onClick={() => setIsPoseModalOpen(false)}
+                  >
                     Guardar Imagen
                   </button>
                 </div>
