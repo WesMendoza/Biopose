@@ -1,5 +1,5 @@
-import React from 'react';
-import { Upload, Settings, RefreshCw, CheckCircle, AlertTriangle, CloudUpload, Loader, Download } from 'lucide-react';
+import { AlertTriangle, CheckCircle, CloudUpload, Download, Loader, RefreshCw } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { useVideoDetection } from '../hooks/useVideoDetection';
 
 const VideoDetection = () => {
@@ -8,16 +8,147 @@ const VideoDetection = () => {
     videoUrl,
     isProcessing,
     progress,
-    framesSkip, setFramesSkip,
-    poseMode, setPoseMode,
-    processedStreamUrl,  
-    downloadUrl,         
-    analysisResults,     
+    mode,
+    setMode,
+    framesSkip,
+    setFramesSkip,
+    poseMode,
+    setPoseMode,
+    confidenceThreshold,
+    setConfidenceThreshold,
+    analysisResults,
+    analysisReport,
+    keypointsData,
+    errorMessage,
+    downloadUrl,
     fileInputRef,
     handleFileChange,
     handleProcessVideo,
-    handleReuploadClick
+    handleReuploadClick,
   } = useVideoDetection();
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const parseKeypoints = (raw: any): Array<{ x: number; y: number; score?: number }> => {
+    if (!raw) return [];
+    if (Array.isArray(raw)) {
+      if (raw.length === 0) return [];
+      if (typeof raw[0] === 'number' && raw.length >= 2) {
+        return [{ x: raw[0], y: raw[1], score: raw[2] ?? 1 }];
+      }
+      return raw.flatMap(parseKeypoints);
+    }
+    if (typeof raw === 'object' && raw !== null) {
+      if (typeof raw.x === 'number' && typeof raw.y === 'number') {
+        return [{ x: raw.x, y: raw.y, score: raw.score ?? 1 }];
+      }
+      if (Array.isArray(raw.keypoints)) {
+        return parseKeypoints(raw.keypoints);
+      }
+      if (Array.isArray(raw.persons)) {
+        return raw.persons.flatMap(parseKeypoints);
+      }
+      if (Array.isArray(raw.frames)) {
+        return parseKeypoints(raw.frames);
+      }
+    }
+    return [];
+  };
+
+  const getFrameData = () => {
+    if (!keypointsData || !videoRef.current) return null;
+
+    const frames = keypointsData.frames || keypointsData;
+    if (!Array.isArray(frames)) return frames;
+
+    const currentTime = videoRef.current.currentTime;
+    const hasTimestamp = frames.some((frame: any) => typeof frame?.timestamp === 'number' || typeof frame?.time === 'number');
+
+    if (hasTimestamp) {
+      const timeKey = frames[0]?.timestamp !== undefined ? 'timestamp' : 'time';
+      let bestFrame = frames[0];
+      let bestDiff = Infinity;
+
+      frames.forEach((frame: any) => {
+        const value = frame?.[timeKey];
+        if (typeof value === 'number') {
+          const diff = Math.abs(value - currentTime);
+          if (diff < bestDiff) {
+            bestDiff = diff;
+            bestFrame = frame;
+          }
+        }
+      });
+
+      return bestFrame;
+    }
+
+    const index = Math.min(Math.max(Math.floor(currentTime * 30), 0), frames.length - 1);
+    return frames[index] || frames[0];
+  };
+
+  const drawOverlay = () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || !keypointsData) return;
+
+    const rect = video.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    canvas.style.width = `${rect.width}px`;
+    canvas.style.height = `${rect.height}px`;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!video.videoWidth || !video.videoHeight) return;
+
+    const scaleX = canvas.width / video.videoWidth;
+    const scaleY = canvas.height / video.videoHeight;
+    const frameData = getFrameData();
+    const points = parseKeypoints(frameData);
+
+    points.forEach((point) => {
+      const x = point.x * scaleX;
+      const y = point.y * scaleY;
+
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, 2 * Math.PI);
+      ctx.fillStyle = 'rgba(16,185,129,0.9)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      if (point.score !== undefined) {
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.font = '10px monospace';
+        ctx.fillText(point.score.toFixed(2), x + 6, y - 6);
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (!keypointsData) {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      return;
+    }
+    drawOverlay();
+  }, [keypointsData]);
+
+  const shouldShowResult = !!analysisResults || !!analysisReport;
+  const totalFrames = analysisResults?.total_frames ?? analysisReport?.totalFrames;
+  const durationSeconds = analysisResults?.duration_seconds ?? analysisReport?.totalDuracionSegundos;
+  const processingSeconds = analysisResults?.processing_time_seconds ?? analysisReport?.tiempoProcesamientoSegundos;
+  const totalDetections = analysisResults?.analysis_report?.total_detections ?? analysisReport?.totalEventos;
+  const averageConfidence = analysisResults?.analysis_report?.average_confidence ?? analysisReport?.confianzaPromedio;
+  const detectionsByType = analysisResults?.analysis_report?.detections_by_type ?? analysisReport?.estadisticas?.detections_by_type;
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -47,6 +178,61 @@ const VideoDetection = () => {
             />
           </div>
 
+          <div className="grid gap-3 lg:grid-cols-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Modo de procesamiento</label>
+              <select
+                value={mode}
+                onChange={(e) => setMode(e.target.value as 'operativo' | 'analitico' | 'debug')}
+                className="w-full px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="operativo">Operativo</option>
+                <option value="analitico">Analítico</option>
+                <option value="debug">Debug</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Dimensión</label>
+              <select
+                value={poseMode}
+                onChange={(e) => setPoseMode(e.target.value as '2D' | '3D')}
+                className="w-full px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="2D">2D</option>
+                <option value="3D">3D</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Salto de frames (fps_skip)</label>
+              <select
+                value={framesSkip}
+                onChange={(e) => setFramesSkip(Number(e.target.value))}
+                className="w-full px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value={1}>1 de cada 1</option>
+                <option value={2}>1 de cada 2</option>
+                <option value={3}>1 de cada 3</option>
+                <option value={4}>1 de cada 4</option>
+                <option value={5}>1 de cada 5</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Confianza mínima</label>
+              <input
+                type="number"
+                min={0.1}
+                max={1}
+                step={0.05}
+                value={confidenceThreshold}
+                onChange={(e) => setConfidenceThreshold(Number(e.target.value))}
+                className="w-full px-3 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+          </div>
+
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={handleProcessVideo}
@@ -58,30 +244,6 @@ const VideoDetection = () => {
               Procesar video
             </button>
 
-            <div className="flex items-center gap-2">
-              <select
-                value={framesSkip}
-                onChange={(e) => setFramesSkip(Number(e.target.value))}
-                className="px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value={0}>Sin saltos de frames</option>
-                <option value={1}>1 frame</option>
-                <option value={2}>2 frames</option>
-                <option value={3}>3 frames (Por defecto)</option>
-                <option value={4}>4 frames</option>
-                <option value={5}>5 frames</option>
-              </select>
-
-              <select
-                value={poseMode}
-                onChange={(e) => setPoseMode(e.target.value as '2D' | '3D')}
-                className="px-3 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500"
-              >
-                <option value="2D">Estimación postural: 2D</option>
-                <option value="3D">Estimación postural: 3D</option>
-              </select>
-            </div>
-
             <button
               onClick={handleReuploadClick}
               className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 font-medium transition-colors ml-auto"
@@ -92,21 +254,22 @@ const VideoDetection = () => {
           </div>
 
           <div className="flex items-center mt-3 text-amber-700 text-xs px-3 py-2 bg-amber-50 rounded border border-amber-200">
-            <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" />
-            <span>¡Aviso! Reducir o quitar el salto de frames aumenta la carga computacional y alarga los tiempos de espera.</span>
+            <AlertTriangle className="w-4 h-4 mr-2 shrink-0" />
+            <span>Reducir el salto de frames aumenta la carga computacional y alarga los tiempos de espera.</span>
           </div>
 
           {isProcessing && (
             <div className="mt-4">
-              <p className="text-sm font-medium text-gray-600 mb-1">
-                Procesando video... Esto puede tomar algunos minutos dependiendo del tamaño del video.
-              </p>
+              <p className="text-sm font-medium text-gray-600 mb-1">Procesando video... Esto puede tomar varios minutos.</p>
               <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div 
-                  className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" 
-                  style={{ width: `${progress}%` }}
-                ></div>
+                <div className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
               </div>
+            </div>
+          )}
+
+          {errorMessage && (
+            <div className="mt-4 rounded-md bg-red-50 border border-red-200 p-4 text-red-700 text-sm">
+              <strong>Error:</strong> {errorMessage}
             </div>
           )}
         </div>
@@ -122,7 +285,7 @@ const VideoDetection = () => {
           </h4>
           <hr className="mb-4 border-gray-200" />
           
-          <div className="flex-grow bg-gray-100 rounded-md flex items-center justify-center overflow-hidden relative min-h-[300px]">
+          <div className="grow bg-gray-100 rounded-md flex items-center justify-center overflow-hidden relative min-h-[18.75rem]">
             {videoUrl ? (
               <video 
                 src={videoUrl || undefined} // <-- CORREGIDO: Evita el tipo 'null' asignando 'undefined'
@@ -158,22 +321,39 @@ const VideoDetection = () => {
           </div>
           <hr className="mb-4 border-gray-200" />
           
-          <div className="flex-grow bg-gray-900 rounded-md flex items-center justify-center overflow-hidden min-h-[300px] relative">
-            {progress === 100 && !isProcessing ? (
-              <video 
-                src={downloadUrl || videoUrl || undefined} // <-- CORREGIDO: Llenamos con undefined si no hay URLs válidas
-                controls 
-                autoPlay
-                className="w-full h-full object-contain bg-black"
-              />
+          <div className="grow bg-gray-900 rounded-md overflow-hidden min-h-[18.75rem] relative">
+            {videoUrl ? (
+              <>
+                <video
+                  ref={videoRef}
+                  src={downloadUrl || videoUrl}
+                  controls
+                  onTimeUpdate={drawOverlay}
+                  onLoadedMetadata={drawOverlay}
+                  className="w-full h-full object-contain bg-black"
+                />
+                <canvas
+                  ref={canvasRef}
+                  className="absolute inset-0 pointer-events-none"
+                />
+              </>
             ) : isProcessing ? (
-              <div className="text-center">
+              <div className="text-center flex items-center justify-center h-full">
                 <Loader className="w-10 h-10 text-indigo-400 animate-spin mx-auto mb-3" />
                 <p className="text-indigo-200 text-sm">Procesando {progress}%...</p>
               </div>
             ) : (
               <div className="text-center p-6 flex flex-col items-center">
-                <p className="text-gray-500 italic">Procese el video cargado para continuar</p>
+                <p className="text-gray-500 italic">Procese el video cargado para ver la vista resultante.</p>
+              </div>
+            )}
+
+            {isProcessing && videoUrl && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                <div className="text-center text-white">
+                  <Loader className="w-10 h-10 mx-auto animate-spin mb-3" />
+                  <p className="text-sm">Procesando {progress}%...</p>
+                </div>
               </div>
             )}
           </div>
@@ -187,17 +367,40 @@ const VideoDetection = () => {
           Información y Resultado
         </h4>
         <hr className="mb-4 border-gray-200" />
-        <div className="bg-gray-50 p-4 rounded-md min-h-[100px] flex items-start text-gray-700 text-sm overflow-auto">
-          {analysisResults ? (
-            <pre className="whitespace-pre-wrap font-mono text-xs w-full">
-              {JSON.stringify(analysisResults, null, 2)}
-            </pre>
-          ) : (
-            <span className="flex items-center justify-center w-full h-full text-gray-500 italic">
-              Los resultados del análisis de comportamiento sospechoso aparecerán aquí.
-            </span>
-          )}
-        </div>
+
+        {shouldShowResult ? (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
+              <p className="text-sm text-gray-600 mb-2">Métricas del análisis</p>
+              <ul className="space-y-2 text-sm text-gray-700">
+                <li><strong>Frames totales:</strong> {totalFrames ?? 'N/A'}</li>
+                <li><strong>Duración (s):</strong> {durationSeconds ?? 'N/A'}</li>
+                <li><strong>Tiempo de proceso (s):</strong> {processingSeconds ?? 'N/A'}</li>
+                <li><strong>Detecciones totales:</strong> {totalDetections ?? 'N/A'}</li>
+                <li><strong>Confianza promedio:</strong> {averageConfidence ?? 'N/A'}</li>
+              </ul>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
+              <p className="text-sm text-gray-600 mb-2">Desglose de detecciones</p>
+              {detectionsByType ? (
+                <pre className="whitespace-pre-wrap text-xs font-mono text-gray-700 bg-white rounded p-3 overflow-x-auto">{JSON.stringify(detectionsByType, null, 2)}</pre>
+              ) : (
+                <p className="text-sm text-gray-500">No hay desgloses disponibles.</p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-gray-50 p-4 rounded-md min-h-[6.25rem] flex items-center justify-center text-gray-500 italic">
+            Los resultados del análisis de comportamiento aparecerán aquí cuando finalice el procesamiento.
+          </div>
+        )}
+
+        {(analysisResults || analysisReport) && (
+          <div className="mt-6 bg-gray-100 p-4 rounded-md border border-gray-200 text-xs text-gray-700 overflow-auto">
+            <p className="font-semibold mb-2">JSON completo de respuesta:</p>
+            <pre className="whitespace-pre-wrap">{JSON.stringify(analysisResults || analysisReport, null, 2)}</pre>
+          </div>
+        )}
       </div>
     </div>
   );

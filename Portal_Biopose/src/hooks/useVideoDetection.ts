@@ -1,89 +1,133 @@
 import { useRef, useState } from 'react';
+import { API_BASE } from '../config';
 import api from '../lib/api';
 
 export const useVideoDetection = () => {
   const [file, setFile] = useState<File | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null); // URL local del video original
-  
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
-  
-  // Parámetros para enviar al backend
+
+  const [mode, setMode] = useState<'operativo' | 'analitico' | 'debug'>('operativo');
   const [framesSkip, setFramesSkip] = useState(3);
   const [poseMode, setPoseMode] = useState<'2D' | '3D'>('2D');
-  
+  const [confidenceThreshold, setConfidenceThreshold] = useState(0.75);
+
+  const [analysisResults, setAnalysisResults] = useState<any>(null);
+  const [analysisReport, setAnalysisReport] = useState<any>(null);
+  const [jsonKeypointsUrl, setJsonKeypointsUrl] = useState<string | null>(null);
+  const [keypointsData, setKeypointsData] = useState<any>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [processedStreamUrl, setProcessedStreamUrl] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // NUEVOS ESTADOS: Para los resultados del backend
-  const [processedStreamUrl, setProcessedStreamUrl] = useState<string | null>(null);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-  const [analysisResults, setAnalysisResults] = useState<any>(null);
+  const resolveUrl = (path: string) => {
+    if (!path) return path;
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    return `${API_BASE.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+  };
+
+  const loadKeypointsJson = async (path: string) => {
+    try {
+      const url = resolveUrl(path);
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('No se pudo cargar los keypoints JSON.');
+      const json = await response.json();
+      setKeypointsData(json);
+      setJsonKeypointsUrl(url);
+    } catch (error) {
+      console.warn('Error cargando JSON de keypoints:', error);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       setFile(selectedFile);
       setVideoUrl(URL.createObjectURL(selectedFile));
-      // Limpiamos estados anteriores si sube un nuevo video
-      setProcessedStreamUrl(null);
-      setDownloadUrl(null);
+      setIsProcessing(false);
+      setProgress(0);
       setAnalysisResults(null);
+      setAnalysisReport(null);
+      setJsonKeypointsUrl(null);
+      setKeypointsData(null);
+      setErrorMessage(null);
+      setDownloadUrl(null);
+      setProcessedStreamUrl(null);
     }
   };
 
   const handleProcessVideo = async () => {
     if (!file) return;
+    setErrorMessage(null);
     setIsProcessing(true);
-    setProgress(10); // Iniciamos el progreso (Subiendo...)
+    setProgress(10);
 
     const fd = new FormData();
-    fd.append('video', file); // Asegúrate de que el backend espera 'video' (o cámbialo a 'file' si es necesario)
+    fd.append('video', file);
 
     try {
-      // 1. SUBIDA DEL VIDEO
       const resUpload = await api.postForm('/api/analysis/media/videos/upload/', fd);
-      const videoId = resUpload?.idVideoUpload || resUpload?.detalle?.idVideoUpload || resUpload?.id || resUpload?.video_id;
-      
-      if (!videoId) throw new Error("No se recibió el ID del video subido.");
-      setProgress(30); // Subida completa
+      const createdVideoId = resUpload?.idVideoUpload || resUpload?.id || resUpload?.video_id;
 
-      // 2. INICIAR EL PROCESAMIENTO (YOLOv8)
-      const resProcess = await api.post(`/api/analysis/videos/${videoId}/process/`, { 
-        fps_skip: framesSkip, 
-        dimension: poseMode 
+      if (!createdVideoId) {
+        throw new Error('No se recibió el ID del video subido.');
+      }
+
+      setProgress(30);
+
+      await api.post(`/api/analysis/videos/${createdVideoId}/process/`, {
+        mode,
+        dimension: poseMode,
+        fps_skip: framesSkip,
+        confidence_threshold: confidenceThreshold,
       });
-      setProgress(40); // Procesamiento iniciado
 
-      // 3. POLLING: Consultar resultados cada 3 segundos
-      const interval = setInterval(async () => {
+      setProgress(45);
+
+      const intervalId = window.setInterval(async () => {
         try {
-          const resStatus = await api.get(`/api/analysis/videos/${videoId}/results/`);
-          
-          // El backend devuelve "completed" cuando termina
+          const resStatus = await api.get(`/api/analysis/videos/${createdVideoId}/results/`);
+
           if (resStatus?.status === 'completed') {
-            clearInterval(interval);
+            window.clearInterval(intervalId);
             setProgress(100);
             setIsProcessing(false);
-            
-            // Guardamos los resultados (JSON con métricas)
             setAnalysisResults(resStatus);
-            
-          } else if (resStatus?.status === 'processing') {
-            // Si el backend aún no termina, hacemos que la barra avance lentamente hasta el 90%
-            setProgress((prev) => (prev < 90 ? prev + 5 : 90));
-          }
-        } catch (error) {
-          console.error("Error consultando estado:", error);
-          clearInterval(interval);
-          setIsProcessing(false);
-          alert("Se perdió la conexión al consultar el estado del procesamiento.");
-        }
-      }, 3000); // Consulta cada 3000 milisegundos (3 segundos)
+            setAnalysisReport(resStatus.analysis_report || null);
 
+            const streamUrl = resStatus.stream_url || resStatus.video_url || resStatus.download_url || resStatus.rutaVideoProcesado || resStatus.rutaArchivoProcesado || null;
+            if (streamUrl) {
+              setDownloadUrl(resolveUrl(streamUrl));
+            }
+
+            const jsonPath = resStatus.rutaJsonKeypoints || resStatus.analysis_report?.rutaJsonKeypoints || resStatus.ruta_json_keypoints || null;
+            if (jsonPath) {
+              await loadKeypointsJson(jsonPath);
+            }
+          } else if (resStatus?.status === 'processing') {
+            setProgress((prev) => (prev < 90 ? prev + 5 : 90));
+          } else if (resStatus?.status === 'failed') {
+            window.clearInterval(intervalId);
+            setErrorMessage(resStatus?.message || 'El procesamiento falló.');
+            setIsProcessing(false);
+          } else {
+            setProgress((prev) => (prev < 80 ? prev + 3 : prev));
+          }
+        } catch (error: any) {
+          console.error('Error consultando estado:', error);
+          window.clearInterval(intervalId);
+          setIsProcessing(false);
+          setErrorMessage('Se perdió la conexión al consultar el estado del procesamiento.');
+        }
+      }, 3000);
     } catch (error: any) {
       setIsProcessing(false);
       setProgress(0);
-      alert(error?.response?.mensaje || 'Error al enviar el video al servidor');
+      const message = error?.response?.mensaje || error?.message || 'Error al enviar el video al servidor';
+      setErrorMessage(message);
     }
   };
 
@@ -92,9 +136,13 @@ export const useVideoDetection = () => {
     setVideoUrl(null);
     setIsProcessing(false);
     setProgress(0);
-    setProcessedStreamUrl(null);
-    setDownloadUrl(null);
     setAnalysisResults(null);
+    setAnalysisReport(null);
+    setJsonKeypointsUrl(null);
+    setKeypointsData(null);
+    setErrorMessage(null);
+    setDownloadUrl(null);
+    setProcessedStreamUrl(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -105,11 +153,21 @@ export const useVideoDetection = () => {
     videoUrl,
     isProcessing,
     progress,
-    framesSkip, setFramesSkip,
-    poseMode, setPoseMode,
+    mode,
+    setMode,
+    framesSkip,
+    setFramesSkip,
+    poseMode,
+    setPoseMode,
+    confidenceThreshold,
+    setConfidenceThreshold,
     processedStreamUrl,  // <-- Exportamos la URL del streaming
     downloadUrl,         // <-- Exportamos la URL de descarga
     analysisResults,     // <-- Exportamos los resultados
+    analysisReport,
+    jsonKeypointsUrl,
+    keypointsData,
+    errorMessage,
     fileInputRef,
     handleFileChange,
     handleProcessVideo,

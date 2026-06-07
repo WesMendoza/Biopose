@@ -8,7 +8,6 @@ export const useGenerarImagenes = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [fps, setFps] = useState(1);
   
-  // <-- ESTOS ERAN LOS ESTADOS QUE FALTABAN
   const [width, setWidth] = useState(250);
   const [height, setHeight] = useState(250);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -33,30 +32,61 @@ export const useGenerarImagenes = () => {
     setIsProcessing(true);
 
     const fd = new FormData();
-    // Claves exactas que espera tu GenerateFramesRequestSerializer en Django
     fd.append('video', file);
-    fd.append('fps_value', String(fps));
-    fd.append('max_duration_seconds', '0'); // 0 = Procesar todo el video
 
     try {
-      const res = await api.postForm('/api/analysis/frames/generate-from-video/', fd);
-      
-      const data = res?.detalle || res;
-      
-      if (data?.frames) {
-        setGeneratedFrames(data.frames);
-        setResultsData({
-          total_frames: data.total_frames_generated,
-          duration: data.duration_seconds,
-          message: data.message
-        });
+      // PASO 1: Subir el video usando el endpoint de Media
+      const resUpload = await api.postForm('/api/analysis/media/videos/upload/', fd);
+      const videoId = resUpload?.idVideoUpload || resUpload?.id || resUpload?.video_id;
+
+      if (!videoId) {
+        throw new Error('No se recibió el ID del video subido.');
       }
-      
-      setIsModalOpen(true);
+
+      // PASO 2: Mandar a procesar usando el endpoint de Behavior
+      await api.post(`/api/analysis/videos/${videoId}/process/`, {
+        mode: 'operativo',
+        dimension: '2D',
+        fps_skip: fps, // Enviamos tu estado de fps como parámetro fps_skip
+        confidence_threshold: 0.75
+      });
+
+      // PASO 3: Consultar el estado cíclicamente (Polling)
+      const intervalId = window.setInterval(async () => {
+        try {
+          const resStatus = await api.get(`/api/analysis/videos/${videoId}/results/`);
+
+          if (resStatus?.status === 'completed') {
+            window.clearInterval(intervalId);
+            setIsProcessing(false);
+
+            // Mapeamos los datos que SÍ devuelve tu backend actualmente
+            setResultsData({
+              total_frames: resStatus.total_frames,
+              duration: resStatus.duration_seconds,
+              message: "Análisis completado con éxito"
+            });
+
+            // Si en el futuro tu backend devuelve un array de URLs de imágenes,
+            // se setearían aquí: setGeneratedFrames(resStatus.frames || []);
+
+            setIsModalOpen(true);
+          } else if (resStatus?.status === 'failed') {
+            window.clearInterval(intervalId);
+            setIsProcessing(false);
+            alert(resStatus?.message || 'Error crítico en el procesamiento del video.');
+          }
+        } catch (error) {
+          console.error('Error consultando estado:', error);
+          window.clearInterval(intervalId);
+          setIsProcessing(false);
+          alert('Se perdió la conexión al consultar el estado del procesamiento.');
+        }
+      }, 3000); // Consulta cada 3 segundos
+
     } catch (error: any) {
-      alert(error?.response?.mensaje || 'Error al generar los fotogramas');
-    } finally {
       setIsProcessing(false);
+      alert(error?.response?.mensaje || error?.message || 'Error al comunicarse con el servidor');
     }
   };
 
@@ -79,9 +109,9 @@ export const useGenerarImagenes = () => {
     videoUrl,
     isProcessing,
     fps, setFps,
-    width, setWidth,             // <-- Agregados al return
-    height, setHeight,           // <-- Agregados al return
-    isModalOpen, setIsModalOpen, // <-- Agregado setIsModalOpen
+    width, setWidth,
+    height, setHeight,
+    isModalOpen, setIsModalOpen,
     generatedFrames,
     resultsData,
     fileInputRef,
