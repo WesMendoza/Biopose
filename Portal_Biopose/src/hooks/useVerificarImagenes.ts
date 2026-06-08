@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export const useVerificarImagenes = () => {
   const [selectedPath, setSelectedPath] = useState('');
@@ -6,19 +6,30 @@ export const useVerificarImagenes = () => {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [errorPath, setErrorPath] = useState(false);
   const [errorFile, setErrorFile] = useState(false);
+  
+  // NUEVO: Estado para almacenar las rutas dinámicas
+  const [paths, setPaths] = useState<any[]>([]);
 
-  const paths = [
-    { id: 1, name: '/videos/test1' },
-    { id: 2, name: '/videos/training' },
-  ];
+  // NUEVO: Leemos las rutas reales guardadas en la configuración al montar el componente
+  useEffect(() => {
+    const savedRoutes = localStorage.getItem('biopose_routes');
+    if (savedRoutes) {
+      const parsedRoutes = JSON.parse(savedRoutes).map((r: any) => ({
+        id: r.id, 
+        name: r.directory 
+      }));
+      setPaths(parsedRoutes);
+    }
+  }, []);
 
+  // Archivos simulados (luego esto vendrá de tu backend)
   const files = [
     { id: 1, name: 'frame_001.jpg', pathId: 1 },
     { id: 2, name: 'frame_002.jpg', pathId: 1 },
     { id: 3, name: 'training_img1.jpg', pathId: 2 },
   ];
 
-  // Filtern files based on selected path
+  // Filtrar archivos según la ruta seleccionada
   const availableFiles = files.filter(f => selectedPath && f.pathId === Number(selectedPath));
 
   const handleLoadImage = () => {
@@ -39,7 +50,7 @@ export const useVerificarImagenes = () => {
 
     if (hasError) return;
 
-    // Simulate loading the image
+    // Simular la carga de la imagen
     const fileName = availableFiles.find(f => f.id === Number(selectedFile))?.name;
     setImageUrl(`https://via.placeholder.com/600x400.png?text=Simulated+Image:+${fileName}`);
   };
@@ -50,7 +61,7 @@ export const useVerificarImagenes = () => {
     imageUrl, setImageUrl,
     errorPath, setErrorPath,
     errorFile, setErrorFile,
-    paths,
+    paths, // <-- Ahora exporta las rutas dinámicas
     availableFiles,
     handleLoadImage
   };

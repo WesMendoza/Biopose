@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import api from '../lib/api';
 
 export const useCargaImagen = () => {
@@ -12,7 +12,19 @@ export const useCargaImagen = () => {
   const [poseResults, setPoseResults] = useState<any>(null);
   const [imageId, setImageId] = useState<number | null>(null);
   
+  // NUEVO: Estado para las rutas dinámicas
+  const [selectedPath, setSelectedPath] = useState('');
+  const [paths, setPaths] = useState<any[]>([]);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // NUEVO: Cargar rutas desde localStorage al iniciar
+  useEffect(() => {
+    const savedRoutes = localStorage.getItem('biopose_routes');
+    if (savedRoutes) {
+      setPaths(JSON.parse(savedRoutes));
+    }
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -37,6 +49,8 @@ export const useCargaImagen = () => {
 
     const fd = new FormData();
     fd.append('image', file);
+    // Si en el futuro tu backend necesita guardar la imagen en la ruta específica:
+    // fd.append('ruta_id', selectedPath);
 
     try {
       // PASO 1: Subir imagen
@@ -72,6 +86,9 @@ export const useCargaImagen = () => {
     setIsPoseModalOpen,
     poseResults,
     imageId,
+    selectedPath,     // <-- Exportamos la ruta seleccionada
+    setSelectedPath,  // <-- Exportamos el actualizador
+    paths,            // <-- Exportamos la lista de rutas
     fileInputRef,
     handleFileChange,
     handleProcessClick,
