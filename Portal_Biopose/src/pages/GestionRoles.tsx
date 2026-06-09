@@ -54,7 +54,7 @@ const GestionRoles = () => {
 
       {/* Modal Crear */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
             <button onClick={closeModals} className="absolute top-4 right-4 text-gray-500"><X size={20} /></button>
             <h2 className="text-xl font-bold mb-4">Crear Rol</h2>
@@ -71,7 +71,7 @@ const GestionRoles = () => {
 
       {/* Modal Editar */}
       {isEditModalOpen && selectedRol && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
             <button onClick={closeModals} className="absolute top-4 right-4 text-gray-500"><X size={20} /></button>
             <h2 className="text-xl font-bold mb-4">Editar Rol</h2>
@@ -88,7 +88,7 @@ const GestionRoles = () => {
 
       {/* Modal Eliminar */}
       {isDeleteModalOpen && selectedRol && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-sm p-6 text-center relative">
             <h2 className="text-xl font-bold mb-2">¿Eliminar Rol?</h2>
             <p className="mb-6 text-sm text-gray-600">Esta acción no se puede deshacer.</p>

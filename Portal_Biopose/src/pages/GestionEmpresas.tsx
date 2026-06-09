@@ -60,7 +60,7 @@ const GestionEmpresas = () => {
 
       {/* Modal Crear */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
             <button onClick={closeModals} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"><X size={20} /></button>
             <h2 className="text-xl font-bold mb-4">Crear Empresa</h2>
@@ -79,7 +79,7 @@ const GestionEmpresas = () => {
 
       {/* Modal Editar */}
       {isEditModalOpen && selectedEmpresa && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
             <button onClick={closeModals} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"><X size={20} /></button>
             <h2 className="text-xl font-bold mb-4">Editar Empresa</h2>
@@ -98,7 +98,7 @@ const GestionEmpresas = () => {
 
       {/* Modal Eliminar */}
       {isDeleteModalOpen && selectedEmpresa && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-sm p-6 text-center relative">
             <h2 className="text-xl font-bold mb-2">¿Eliminar Empresa?</h2>
             <p className="mb-6 text-sm text-gray-600">Esta acción no se puede deshacer.</p>

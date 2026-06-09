@@ -19,28 +19,42 @@ const AppRouter = () => {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Default root -> show login first */}
+        <Route path="/" element={<Navigate to="/login" replace />} />
+
         <Route path="/login" element={<Login />} />
         <Route path="/create-account" element={<CreateAccount />} />
-        
-        {/* Protected Routes Wrapper could go here */}
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/users" element={<GestionUsuarios />} />
-          
-          <Route path="/pose/routes" element={<ConfiguracionRutas />} />
-          <Route path="/pose/image" element={<CargaImagen />} />
-          <Route path="/pose/video" element={<GenerarImagenes />} />
-          <Route path="/pose/verify" element={<VerificarImagenes />} />
 
-          <Route path="/events/individual/video" element={<VideoDetection />} />
-          <Route path="/events/individual/live" element={<LiveDetection />} />
-          
-          <Route path="/events/multi/video" element={<VideoActionMultiPerson />} />
-          <Route path="/events/multi/live" element={<LiveActionMultiPerson />} />
-          <Route path="/gestion-empresas" element={<GestionEmpresas />} />
-          <Route path="/gestion-roles" element={<GestionRoles />} />
+        {/* Protected Routes under /app (Layout) */}
+        <Route path="/app" element={<Layout />}>
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="users" element={<GestionUsuarios />} />
+
+          <Route path="pose">
+            <Route path="routes" element={<ConfiguracionRutas />} />
+            <Route path="image" element={<CargaImagen />} />
+            <Route path="video" element={<GenerarImagenes />} />
+            <Route path="verify" element={<VerificarImagenes />} />
+          </Route>
+
+          <Route path="events">
+            <Route path="individual">
+              <Route path="video" element={<VideoDetection />} />
+              <Route path="live" element={<LiveDetection />} />
+            </Route>
+            <Route path="multi">
+              <Route path="video" element={<VideoActionMultiPerson />} />
+              <Route path="live" element={<LiveActionMultiPerson />} />
+            </Route>
+          </Route>
+
+          <Route path="gestion-empresas" element={<GestionEmpresas />} />
+          <Route path="gestion-roles" element={<GestionRoles />} />
         </Route>
+
+        {/* Fallback: redirect unknown routes to login */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
   );

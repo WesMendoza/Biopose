@@ -45,23 +45,27 @@ const Sidebar = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 py-4 space-y-2 overflow-x-hidden">
-          <NavLink to="/dashboard" className={navLinkClass} title="Home">
+          {/* CORREGIDO: Añadido /app */}
+          <NavLink to="/app/dashboard" className={navLinkClass} title="Home">
             <Home className="w-5 h-5 flex-shrink-0" />
             {isSidebarOpen && <span>Home</span>}
           </NavLink>
 
           {/* Sección de Administración */}
-          <NavLink to="/users" className={navLinkClass} title="Gestión de Usuarios">
+          {/* CORREGIDO: Añadido /app */}
+          <NavLink to="/app/users" className={navLinkClass} title="Gestión de Usuarios">
             <Users className="w-5 h-5 flex-shrink-0" />
             {isSidebarOpen && <span>Gestión de Usuarios</span>}
           </NavLink>
 
-          <NavLink to="/gestion-empresas" className={navLinkClass} title="Gestión de Empresas">
+          {/* CORREGIDO: Añadido /app */}
+          <NavLink to="/app/gestion-empresas" className={navLinkClass} title="Gestión de Empresas">
             <Building2 className="w-5 h-5 flex-shrink-0" />
             {isSidebarOpen && <span>Gestión de Empresas</span>}
           </NavLink>
 
-          <NavLink to="/gestion-roles" className={navLinkClass} title="Gestión de Roles">
+          {/* CORREGIDO: Añadido /app */}
+          <NavLink to="/app/gestion-roles" className={navLinkClass} title="Gestión de Roles">
             <Shield className="w-5 h-5 flex-shrink-0" />
             {isSidebarOpen && <span>Gestión de Roles</span>}
           </NavLink>
@@ -83,19 +87,20 @@ const Sidebar = () => {
             
             {openSection === 'pose' && (
               <div className="mt-1 space-y-1">
-                <NavLink to="/pose/routes" className={subNavLinkClass} title="Configuración de rutas">
+                {/* CORREGIDOS: Añadido /app */}
+                <NavLink to="/app/pose/routes" className={subNavLinkClass} title="Configuración de rutas">
                   <FolderOpen className="w-4 h-4 flex-shrink-0" />
                   {isSidebarOpen && <span>Configuración de rutas</span>}
                 </NavLink>
-                <NavLink to="/pose/image" className={subNavLinkClass} title="Detección en imagen">
+                <NavLink to="/app/pose/image" className={subNavLinkClass} title="Detección en imagen">
                   <ImageIcon className="w-4 h-4 flex-shrink-0" />
                   {isSidebarOpen && <span>Detección en imagen</span>}
                 </NavLink>
-                <NavLink to="/pose/video" className={subNavLinkClass} title="Detección en video">
+                <NavLink to="/app/pose/video" className={subNavLinkClass} title="Detección en video">
                   <Film className="w-4 h-4 flex-shrink-0" />
                   {isSidebarOpen && <span>Detección en video</span>}
                 </NavLink>
-                <NavLink to="/pose/verify" className={subNavLinkClass} title="Verifica tus imágenes">
+                <NavLink to="/app/pose/verify" className={subNavLinkClass} title="Verifica tus imágenes">
                   <UserCheck className="w-4 h-4 flex-shrink-0" />
                   {isSidebarOpen && <span>Verifica tus imágenes</span>}
                 </NavLink>
@@ -124,11 +129,12 @@ const Sidebar = () => {
                     Individual
                   </div>
                 )}
-                <NavLink to="/events/individual/video" className={subNavLinkClass} title="Detección en video (Individual)">
+                {/* CORREGIDOS: Añadido /app */}
+                <NavLink to="/app/events/individual/video" className={subNavLinkClass} title="Detección en video (Individual)">
                   <Film className="w-4 h-4 flex-shrink-0" />
                   {isSidebarOpen && <span>Detección en video</span>}
                 </NavLink>
-                <NavLink to="/events/individual/live" className={subNavLinkClass} title="Detección en vivo (Individual)">
+                <NavLink to="/app/events/individual/live" className={subNavLinkClass} title="Detección en vivo (Individual)">
                   <Video className="w-4 h-4 flex-shrink-0" />
                   {isSidebarOpen && <span>Detección en vivo</span>}
                 </NavLink>
@@ -138,11 +144,12 @@ const Sidebar = () => {
                     Multipersonas
                   </div>
                 )}
-                <NavLink to="/events/multi/video" className={subNavLinkClass} title="Detección en video (Multipersona)">
+                {/* CORREGIDOS: Añadido /app */}
+                <NavLink to="/app/events/multi/video" className={subNavLinkClass} title="Detección en video (Multipersona)">
                   <Film className="w-4 h-4 flex-shrink-0" />
                   {isSidebarOpen && <span>Detección en video</span>}
                 </NavLink>
-                <NavLink to="/events/multi/live" className={subNavLinkClass} title="Detección en vivo (Multipersona)">
+                <NavLink to="/app/events/multi/live" className={subNavLinkClass} title="Detección en vivo (Multipersona)">
                   <Video className="w-4 h-4 flex-shrink-0" />
                   {isSidebarOpen && <span>Detección en vivo</span>}
                 </NavLink>

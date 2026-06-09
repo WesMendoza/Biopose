@@ -158,7 +158,7 @@ const ConfiguracionRutas = () => {
 
       {/* Create Folder Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 relative">
             <h2 className="text-xl font-bold text-gray-800 mb-4">Agregar Nueva Carpeta</h2>
             
@@ -193,7 +193,7 @@ const ConfiguracionRutas = () => {
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && selectedRoute && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 text-center">
             <div className="mx-auto w-12 h-12 bg-red-100 flex items-center justify-center rounded-full mb-4">
               <Trash2 className="text-red-600" size={24} />

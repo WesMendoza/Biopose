@@ -95,7 +95,7 @@ const GestionUsuarios = () => {
 
       {/* Modal Crear Usuario */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
             <button
               onClick={closeModals}
@@ -184,7 +184,7 @@ const GestionUsuarios = () => {
 
       {/* Modal Editar Usuario */}
       {isEditModalOpen && selectedUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
             <button
               onClick={closeModals}
@@ -291,7 +291,7 @@ const GestionUsuarios = () => {
 
       {/* Modal Eliminar Usuario */}
       {isDeleteModalOpen && selectedUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-sm p-6 text-center relative">
             <h2 className="text-xl font-bold mb-2">¿Estás seguro de eliminar este usuario?</h2>
             <p className="text-gray-600 mb-6 text-sm">

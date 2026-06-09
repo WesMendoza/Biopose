@@ -13,12 +13,30 @@ export const useLogin = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    
     if (!email || !password) {
       setError('Por favor complete todos los campos');
       return;
     }
 
     setLoading(true);
+
+    // ==========================================
+    // BYPASS: USUARIO QUEMADO PARA DESARROLLO
+    // ==========================================
+    if (email === 'admin@admin.com' && password === '12345') {
+      // Simulamos un pequeño tiempo de carga de 1 segundo
+      setTimeout(() => {
+        // Guardamos un token falso en el localStorage
+        localStorage.setItem('token', 'fake-jwt-token-bypass-desarrollo-12345');
+        setLoading(false);
+        // Navegamos a la ruta protegida correcta
+        navigate('/app/dashboard'); 
+      }, 1000);
+      return; // Evitamos que intente llamar al backend
+    }
+    // ==========================================
+
     try {
       const res = await fetch(`${API_BASE}/api/auth/login/`, {
         method: 'POST',
@@ -29,7 +47,8 @@ export const useLogin = () => {
       const data = await res.json();
       if (res.ok && data?.detalle?.token) {
         localStorage.setItem('token', data.detalle.token);
-        navigate('/dashboard');
+        // Navegamos a la ruta protegida correcta
+        navigate('/app/dashboard');
       } else {
         setError(data?.mensaje || 'Credenciales inválidas');
       }
