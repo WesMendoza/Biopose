@@ -1,123 +1,121 @@
-import { useState, useRef } from 'react';
+import { useRef, useState } from 'react';
 import api from '../lib/api';
 
 export const useGenerarImagenes = () => {
   const [file, setFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [fps, setFps] = useState<number>(5);
+  const [width, setWidth] = useState<number>(300);
+  const [height, setHeight] = useState<number>(300);
   
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [fps, setFps] = useState(1);
-  
-  const [width, setWidth] = useState(250);
-  const [height, setHeight] = useState(250);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  
-  const [generatedFrames, setGeneratedFrames] = useState<any[]>([]);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // NUEVO: Guardamos el JSON con los puntos y los datos
+  const [keypointsData, setKeypointsData] = useState<any[]>([]);
   const [resultsData, setResultsData] = useState<any>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       setFile(selectedFile);
       setVideoUrl(URL.createObjectURL(selectedFile));
-      setGeneratedFrames([]);
+      setIsProcessing(false);
+      setKeypointsData([]);
       setResultsData(null);
+      setErrorMessage(null);
+    }
+  };
+
+  const handleReuploadClick = () => {
+    if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+    setFile(null);
+    setVideoUrl(null);
+    setIsProcessing(false);
+    setIsModalOpen(false);
+    setKeypointsData([]);
+    setResultsData(null);
+    setErrorMessage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
   const handleGenerateImages = async () => {
     if (!file) return;
+    setErrorMessage(null);
     setIsProcessing(true);
 
     const fd = new FormData();
     fd.append('video', file);
 
     try {
-      // PASO 1: Subir el video usando el endpoint de Media
       const resUpload = await api.postForm('/api/analysis/media/videos/upload/', fd);
-      const videoId = resUpload?.idVideoUpload || resUpload?.id || resUpload?.video_id;
+      const createdVideoId = resUpload?.idVideoUpload || resUpload?.id || resUpload?.video_id;
 
-      if (!videoId) {
-        throw new Error('No se recibió el ID del video subido.');
-      }
+      if (!createdVideoId) throw new Error('No se recibió el ID del video subido.');
 
-      // PASO 2: Mandar a procesar usando el endpoint de Behavior
-      await api.post(`/api/analysis/videos/${videoId}/process/`, {
-        mode: 'operativo',
-        dimension: '2D',
-        fps_skip: fps, // Enviamos tu estado de fps como parámetro fps_skip
-        confidence_threshold: 0.75
-      });
+      // Mandamos a analizar el comportamiento
+      await api.post(`/api/analysis/videos/${createdVideoId}/process/`, { fps_skip: fps });
 
-      // PASO 3: Consultar el estado cíclicamente (Polling)
-      const intervalId = window.setInterval(async () => {
+      const pollResults = async () => {
         try {
-          const resStatus = await api.get(`/api/analysis/videos/${videoId}/results/`);
+          const resStatus = await api.get(`/api/analysis/videos/${createdVideoId}/results/`);
+          const currentStatus = (resStatus?.status || '').toLowerCase();
 
-          if (resStatus?.status === 'completed') {
-            window.clearInterval(intervalId);
+          if (currentStatus === 'completed') {
             setIsProcessing(false);
+            if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
 
-            // Mapeamos los datos que SÍ devuelve tu backend actualmente
-            setResultsData({
-              total_frames: resStatus.total_frames,
-              duration: resStatus.duration_seconds,
-              message: "Análisis completado con éxito"
-            });
+            setResultsData(resStatus.analysis_report || resStatus);
 
-            // Si en el futuro tu backend devuelve un array de URLs de imágenes,
-            // se setearían aquí: setGeneratedFrames(resStatus.frames || []);
+            // ¡CRÍTICO! Pedimos el JSON con las coordenadas para dárselas a React
+            try {
+              const keypointsRes = await api.get(`/api/analysis/videos/${createdVideoId}/keypoints-json/`);
+              const framesData = keypointsRes.keypoints_data || keypointsRes.keypoints || keypointsRes.frames || keypointsRes.data || (Array.isArray(keypointsRes) ? keypointsRes : []);
+              
+              setKeypointsData(framesData);
+              
+              if (framesData.length > 0) {
+                setIsModalOpen(true);
+              } else {
+                setErrorMessage("No se detectaron poses en este video.");
+              }
+            } catch (err) {
+              setErrorMessage("Se completó el análisis pero falló la descarga de coordenadas.");
+            }
 
-            setIsModalOpen(true);
-          } else if (resStatus?.status === 'failed') {
-            window.clearInterval(intervalId);
+          } else if (currentStatus === 'failed') {
             setIsProcessing(false);
-            alert(resStatus?.message || 'Error crítico en el procesamiento del video.');
+            if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+            setErrorMessage(resStatus?.message || 'Falló en el servidor.');
+          } else {
+            pollTimeoutRef.current = setTimeout(pollResults, 5000);
           }
-        } catch (error) {
-          console.error('Error consultando estado:', error);
-          window.clearInterval(intervalId);
+        } catch (error: any) {
           setIsProcessing(false);
-          alert('Se perdió la conexión al consultar el estado del procesamiento.');
+          if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+          setErrorMessage('Se perdió la conexión.');
         }
-      }, 3000); // Consulta cada 3 segundos
+      };
+
+      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = setTimeout(pollResults, 5000);
 
     } catch (error: any) {
       setIsProcessing(false);
-      alert(error?.response?.mensaje || error?.message || 'Error al comunicarse con el servidor');
-    }
-  };
-
-  const closeModals = () => {
-    setIsModalOpen(false);
-  };
-
-  const handleReuploadClick = () => {
-    setFile(null);
-    setVideoUrl(null);
-    setGeneratedFrames([]);
-    setResultsData(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      setErrorMessage(error?.message || 'Error al comunicarse con el servidor');
     }
   };
 
   return {
-    file,
-    videoUrl,
-    isProcessing,
-    fps, setFps,
-    width, setWidth,
-    height, setHeight,
-    isModalOpen, setIsModalOpen,
-    generatedFrames,
-    resultsData,
-    fileInputRef,
-    handleFileChange,
-    handleGenerateImages,
-    closeModals,
-    handleReuploadClick
+    file, videoUrl, fps, setFps, width, setWidth, height, setHeight,
+    isProcessing, isModalOpen, setIsModalOpen,
+    keypointsData, resultsData, errorMessage,
+    fileInputRef, handleFileChange, handleGenerateImages, handleReuploadClick
   };
 };
