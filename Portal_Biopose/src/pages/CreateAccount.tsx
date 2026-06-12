@@ -11,134 +11,90 @@ const CreateAccount = () => {
   } = useCreateAccount();
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl flex overflow-hidden">
+    <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 sm:p-8 font-sans relative overflow-hidden">
+      
+      {/* Brillo celeste de fondo */}
+      <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[50%] bg-[#0ea5e9] opacity-[0.08] rounded-full blur-[120px] pointer-events-none"></div>
+
+      {/* 1. SE ELIMINÓ min-h-[650px] PARA QUE SE ADAPTE AL CONTENIDO */}
+      <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-6xl flex overflow-hidden relative z-10">
         
-        {/* Left Sidebar Image/Decor */}
-        <div className="w-1/3 bg-indigo-600 hidden md:flex flex-col items-center justify-center p-8 text-white">
-          <UserPlus size={64} className="mb-6 opacity-80" />
-          <h2 className="text-2xl font-bold mb-4 text-center">Únete a BioPose</h2>
-          <p className="text-center text-indigo-100 mb-8">
-            Crea tu cuenta para acceder a potentes herramientas de detección y análisis de comportamiento por video.
+        {/* Panel Izquierdo */}
+        <div className="w-1/3 bg-[#2563eb] hidden md:flex flex-col items-center justify-center p-8 text-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 -mt-16 -mr-16 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl"></div>
+          
+          <UserPlus size={56} className="mb-4 text-white/90" strokeWidth={1.5} />
+          <h2 className="text-2xl font-bold mb-3 text-center tracking-tight">Únete a BioPose</h2>
+          <p className="text-center text-blue-100 mb-8 text-sm leading-relaxed">
+            Crea tu cuenta para acceder a potentes herramientas de detección.
           </p>
-          <div className="space-y-4 w-full">
-            <div className="flex items-center text-sm font-medium opacity-80">
-              <CheckCircle className="w-5 h-5 mr-3 text-indigo-300" />
+          
+          <div className="space-y-3 w-full">
+            <div className="flex items-center text-xs font-medium text-blue-100/90">
+              <CheckCircle className="w-4 h-4 mr-2 text-sky-300 flex-shrink-0" />
               <span>Acceso a Modelos 2D y 3D</span>
             </div>
-            <div className="flex items-center text-sm font-medium opacity-80">
-              <CheckCircle className="w-5 h-5 mr-3 text-indigo-300" />
+            <div className="flex items-center text-xs font-medium text-blue-100/90">
+              <CheckCircle className="w-4 h-4 mr-2 text-sky-300 flex-shrink-0" />
               <span>Detección de Múltiples Personas</span>
             </div>
-            <div className="flex items-center text-sm font-medium opacity-80">
-              <CheckCircle className="w-5 h-5 mr-3 text-indigo-300" />
+            <div className="flex items-center text-xs font-medium text-blue-100/90">
+              <CheckCircle className="w-4 h-4 mr-2 text-sky-300 flex-shrink-0" />
               <span>Análisis de Comportamiento</span>
             </div>
           </div>
         </div>
 
-        {/* Right Form Container */}
-        <div className="w-full md:w-2/3 p-8 lg:p-12 relative flex flex-col justify-center">
+        {/* 2. SE REDUJO EL PADDING DEL CONTENEDOR DERECHO (p-8 md:p-10) */}
+        <div className="w-full md:w-2/3 p-8 md:p-10 relative flex flex-col justify-center">
           
-          <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center md:text-left">
+          <h2 className="text-[26px] font-extrabold text-gray-900 mb-6 text-center md:text-left tracking-tight">
             Crear Cuenta
           </h2>
 
           {isSuccess ? (
-            <div className="flex flex-col items-center justify-center bg-green-50 rounded-lg border border-green-200 p-8 my-8 transition-all">
+            <div className="flex flex-col items-center justify-center bg-green-50 rounded-2xl border border-green-200 p-8 transition-all">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
                 <CheckCircle className="w-8 h-8 text-green-600" />
               </div>
-              <h3 className="text-xl font-bold text-green-800 mb-2">¡Cuenta Creada Exitosamente!</h3>
-              <p className="text-green-600 text-center">Serás redirigido al inicio de sesión en breve...</p>
+              <h3 className="text-xl font-bold text-green-800 mb-2">¡Cuenta Creada!</h3>
+              <p className="text-green-600 text-center text-sm">Serás redirigido al inicio de sesión...</p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Identificación</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-2.5 text-gray-400 w-5 h-5" />
-                    <input
-                      type="text"
-                      name="identificacion"
-                      value={formData.identificacion}
-                      onChange={handleChange}
-                      required
-                      placeholder="Ej: 0102030405"
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                    />
+            <form onSubmit={handleSubmit} className="space-y-4">
+              
+              {/* 3. SE REDUJO EL GAP A gap-4 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {[
+                  { label: "Identificación", name: "identificacion", icon: User, type: "text", placeholder: "Ej: 0102030405" },
+                  { label: "Nombres Completos", name: "nombres", icon: User, type: "text", placeholder: "Ej: Juan" },
+                  { label: "Apellidos Completos", name: "apellidos", icon: User, type: "text", placeholder: "Ej: Pérez" },
+                  { label: "Correo Electrónico", name: "correo", icon: Mail, type: "email", placeholder: "juan@ejemplo.com" },
+                  { label: "Empresa", name: "empresa", icon: Building, type: "text", placeholder: "Empresa EJ." },
+                ].map((field, idx) => (
+                  <div key={idx}>
+                    <label className="block text-[11px] font-bold text-gray-500 mb-1.5 uppercase tracking-wide">{field.label}</label>
+                    <div className="relative">
+                      <field.icon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                      {/* 4. SE REDUJO EL PADDING DE LOS INPUTS (py-2.5) */}
+                      <input
+                        type={field.type}
+                        name={field.name}
+                        value={formData[field.name as keyof typeof formData]}
+                        onChange={handleChange}
+                        required
+                        placeholder={field.placeholder}
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-transparent bg-[#f1f5f9] text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-[#0ea5e9] focus:ring-2 focus:ring-[#0ea5e9]/20 transition-all text-[13px]"
+                      />
+                    </div>
                   </div>
-                </div>
+                ))}
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombres Completos</label>
+                  <label className="block text-[11px] font-bold text-gray-500 mb-1.5 uppercase tracking-wide">Celular</label>
                   <div className="relative">
-                    <User className="absolute left-3 top-2.5 text-gray-400 w-5 h-5" />
-                    <input
-                      type="text"
-                      name="nombres"
-                      value={formData.nombres}
-                      onChange={handleChange}
-                      required
-                      placeholder="Ej: Juan"
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Apellidos Completos</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-2.5 text-gray-400 w-5 h-5" />
-                    <input
-                      type="text"
-                      name="apellidos"
-                      value={formData.apellidos}
-                      onChange={handleChange}
-                      required
-                      placeholder="Ej: Pérez"
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico</label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-2.5 text-gray-400 w-5 h-5" />
-                    <input
-                      type="email"
-                      name="correo"
-                      value={formData.correo}
-                      onChange={handleChange}
-                      required
-                      placeholder="juan@ejemplo.com"
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Empresa</label>
-                  <div className="relative">
-                    <Building className="absolute left-3 top-2.5 text-gray-400 w-5 h-5" />
-                    <input
-                      type="text"
-                      name="empresa"
-                      value={formData.empresa}
-                      onChange={handleChange}
-                      required
-                      placeholder="Empresa EJ."
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Celular</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-gray-400 text-sm font-medium w-5 h-5">#</span>
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-[13px] font-bold w-4 h-4 flex items-center justify-center">#</span>
                     <input
                       type="tel"
                       name="celular"
@@ -146,40 +102,41 @@ const CreateAccount = () => {
                       onChange={handleChange}
                       required
                       placeholder="099xxxxxxx"
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-transparent bg-[#f1f5f9] text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-[#0ea5e9] focus:ring-2 focus:ring-[#0ea5e9]/20 transition-all text-[13px]"
                     />
                   </div>
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+                  <label className="block text-[11px] font-bold text-gray-500 mb-1.5 uppercase tracking-wide">Contraseña</label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-2.5 text-gray-400 w-5 h-5" />
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                     <input
                       type="password"
                       name="password"
                       value={formData.password}
                       onChange={handleChange}
                       required
-                      placeholder="*********"
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                      placeholder="••••••••"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-transparent bg-[#f1f5f9] text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-[#0ea5e9] focus:ring-2 focus:ring-[#0ea5e9]/20 transition-all text-[13px] tracking-widest"
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="mt-8">
+              {/* 5. SE REDUJO EL MARGEN DEL BOTÓN (mt-6) */}
+              <div className="mt-6">
                 <button
                   type="submit"
-                  className="w-full bg-indigo-600 text-white rounded-md py-3 font-semibold hover:bg-indigo-700 transition"
+                  className="w-full bg-[#2563eb] text-white rounded-full py-3.5 font-bold text-[14px] hover:bg-[#1d4ed8] focus:outline-none focus:ring-2 focus:ring-[#2563eb] focus:ring-offset-2 transition-colors shadow-lg shadow-blue-500/30"
                 >
                   Registrarse
                 </button>
               </div>
 
-              <p className="text-center text-sm text-gray-600 mt-4">
+              <p className="text-center text-[12px] text-gray-500 mt-4 font-medium">
                 ¿Ya tienes una cuenta?{' '}
-                <Link to="/login" className="text-indigo-600 hover:text-indigo-800 font-medium">
+                <Link to="/login" className="font-bold text-[#0ea5e9] hover:text-[#0284c7] hover:underline transition-colors">
                   Inicia sesión aquí
                 </Link>
               </p>

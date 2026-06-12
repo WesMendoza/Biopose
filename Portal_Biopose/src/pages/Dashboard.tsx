@@ -1,102 +1,185 @@
 ﻿import React from 'react';
 import { Link } from 'react-router-dom';
-import '../styles/Dashboard.css';
 import { useDashboard } from '../hooks/useDashboard';
+
+// Importación de tus assets
+import mediapipe from '../assets/mediapipe.png';
+import Openpose from '../assets/Openpose.png';
+import yolo from '../assets/yolo.png';
 
 const Dashboard = () => {
   const { showTutorialModal, userName, saveFirstTutorial } = useDashboard();
 
   return (
-    <section className='main_section_container' id='main_section_container'>
-      <div className='content_first_section reveal'>
-        <div className='section_first_left'>
-          <h1>¿Qué es BoiPose?</h1>
-          <h3>Estimación de poses humanas</h3>
-          <p>
-            BoiPose utiliza como base MediaPipe para estimar las diferentes poses 
-            del cuerpo humano y generar 14 keypoints como puntos claves al realizar la estimación.
+    <div className="min-h-screen bg-slate-50 font-sans pb-20">
+      
+      {/* --- SECCIÓN 1: HERO (Qué es BoiPose) --- */}
+      <section className="max-w-7xl mx-auto px-6 pt-12 pb-20 flex flex-col md:flex-row items-center gap-12">
+        <div className="w-full md:w-1/2 space-y-6">
+          <h1 className="text-5xl font-extrabold text-slate-900 tracking-tight">
+            ¿Qué es <span className="text-blue-600">BioPose?</span>
+          </h1>
+          <h3 className="text-2xl font-semibold text-slate-600">
+            Estimación de poses humanas
+          </h3>
+          <p className="text-lg text-slate-500 leading-relaxed">
+            BioPose utiliza como base <strong>MediaPipe</strong> para estimar las diferentes poses 
+            del cuerpo humano y generar 14 keypoints como puntos claves al realizar la estimación con altísima precisión.
           </p>
         </div>
-        <div className='section_first_rigth'>
-          <img src='https://aihub.qualcomm.com/_next/image?url=https%3A%2F%2Fqaihub-public-assets.s3.us-west-2.amazonaws.com%2Fqai-hub-models%2Fmodels%2Fopenpose%2Fweb-assets%2Fmodel_demo.png&w=1920&q=75' alt='Demo OpenPose' />
+        <div className="w-full md:w-1/2 rounded-2xl overflow-hidden shadow-2xl shadow-blue-900/10 transform hover:scale-[1.02] transition-transform duration-500">
+          <img 
+            src="https://aihub.qualcomm.com/_next/image?url=https%3A%2F%2Fqaihub-public-assets.s3.us-west-2.amazonaws.com%2Fqai-hub-models%2Fmodels%2Fopenpose%2Fweb-assets%2Fmodel_demo.png&w=1920&q=75" 
+            alt="Demo OpenPose" 
+            className="w-full h-auto object-cover"
+          />
         </div>
-      </div>
+      </section>
 
-      <div className='content_second_section reveal delay-100'>
-        <div className='cards_container'>
-          <h2 className="text-center font-bold text-sky-400 pb-12 text-4xl">Lo que puedes lograr</h2>
-          <div className='cards'>
-            <div className='card_element rounded-xl overflow-hidden shadow-2xl transform transition hover:-translate-y-2 hover:shadow-cyan-500/50'>
-              <div className='content_info_card' id='folder'>
-                <h4><Link to='/configuracion-rutas' className='nav-link text-white'>Configuración Personalizada</Link></h4>
-              </div>
-            </div>
-            <div className='card_element rounded-xl overflow-hidden shadow-2xl transform transition hover:-translate-y-2 hover:shadow-cyan-500/50'>
-              <div className='content_info_card' id='img'>
-                <h4><Link to='/generar-imagenes' className='nav-link text-white font-semibold text-lg'>Detección en Imágenes</Link></h4>
-              </div>
-            </div>
-            <div className='card_element rounded-xl overflow-hidden shadow-2xl transform transition hover:-translate-y-2 hover:shadow-cyan-500/50'>
-              <div className='content_info_card' id='video'>
-                <h4><Link to='/video-action-multi-person' className='nav-link text-white font-semibold text-lg'>Detección en Videos</Link></h4>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className='content_third_section reveal delay-200'>
-        <div className='content_title w-full md:w-1/3 lg:w-1/4'>
-          <h2 className='title_third_section shadow-xl rounded-3xl bg-blue-600 text-white p-8 md:p-16 relative overflow-hidden'>
-            <span className="relative z-10 text-2xl font-bold">Tiempos de respuesta más rápidos con MediaPipe</span>
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-600 opacity-50 z-0"></div>
+      {/* --- SECCIÓN 2: LO QUE PUEDES LOGRAR (Estilo Neón Oscuro) --- */}
+      <section className="bg-slate-900 py-20 px-6 mt-8 rounded-[3rem] mx-4 md:mx-10 shadow-2xl">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-center font-bold text-sky-400 mb-16 text-4xl tracking-wide">
+            Lo que puedes lograr
           </h2>
-        </div>
-        <div className='container_graphic_compare flex-grow ml-0 md:ml-12'>
-          <div className='openpose_card'>
-            <img src='/assets/Openpose.png' alt='OpenPose' />
-            <h2>OpenPose</h2>
-          </div>
-          <div className='mediapipe_card'>
-            <img src='/assets/mediapipe.png' alt='MediaPipe' />
-            <h2>MediaPipe</h2>
-          </div>
-          <div className='yolo_card'>
-            <img src='/assets/yolo.png' alt='Yolo' />
-            <h2>Yolo</h2>
-          </div>
-        </div>
-      </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            
+            {/* Tarjeta 1: Rosa (Configuración Personalizada) */}
+            <Link 
+              to="/app/pose/routes" 
+              className="group flex items-center justify-center min-h-[160px] bg-slate-800/50 backdrop-blur-sm rounded-xl border-2 border-pink-500/70 hover:border-pink-400 hover:shadow-[0_0_30px_rgba(236,72,153,0.4)] hover:-translate-y-2 transition-all duration-300"
+            >
+              <h4 className="text-white font-semibold text-xl text-center px-6 group-hover:text-pink-100">
+                Configuración Personalizada
+              </h4>
+            </Link>
 
+            {/* Tarjeta 2: Morado (Detección en Imágenes / Generar Imágenes) */}
+            <Link 
+              to="/app/pose/video" 
+              className="group flex items-center justify-center min-h-[160px] bg-slate-800/50 backdrop-blur-sm rounded-xl border-2 border-indigo-500/70 hover:border-indigo-400 hover:shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:-translate-y-2 transition-all duration-300"
+            >
+              <h4 className="text-white font-semibold text-xl text-center px-6 group-hover:text-indigo-100">
+                Detección en Imágenes
+              </h4>
+            </Link>
+
+            {/* Tarjeta 3: Cyan (Detección en Videos Multi-persona) */}
+            <Link 
+              to="/app/events/multi/video" 
+              className="group flex items-center justify-center min-h-[160px] bg-slate-800/50 backdrop-blur-sm rounded-xl border-2 border-cyan-400/70 hover:border-cyan-300 hover:shadow-[0_0_30px_rgba(34,211,238,0.4)] hover:-translate-y-2 transition-all duration-300"
+            >
+              <h4 className="text-white font-semibold text-xl text-center px-6 group-hover:text-cyan-100">
+                Detección en Videos
+              </h4>
+            </Link>
+
+          </div>
+        </div>
+      </section>
+
+     {/* --- SECCIÓN 3: TACÓMETROS CENTRADOS --- */}
+      <section className="max-w-6xl mx-auto px-6 mt-24 mb-12">
+        {/* Contenedor blanco con altura ajustada (min-h-[280px]) */}
+        <div className="bg-white rounded-[2rem] shadow-xl p-6 md:p-8 flex flex-col lg:flex-row items-center min-h-[280px]">
+          
+          {/* Caja Azul Izquierda */}
+          <div className="w-full lg:w-1/3 bg-[#1d4ed8] rounded-3xl h-full flex items-center justify-center p-8 shadow-lg shadow-blue-600/30 transform hover:scale-[1.02] transition-transform">
+            <h2 className="text-[26px] font-bold text-white leading-snug text-center lg:text-left">
+              Tiempos de respuesta más rápidos con MediaPipe
+            </h2>
+          </div>
+
+          {/* Contenedor de Tacómetros Centrados */}
+          <div className="w-full lg:w-2/3 flex flex-row justify-center items-center gap-6 md:gap-14 mt-8 lg:mt-0">
+            
+            {/* OpenPose */}
+            <div className="flex flex-col items-center transform hover:-translate-y-2 transition-transform">
+              <img src={Openpose} alt="OpenPose" className="w-24 md:w-28 object-contain mb-3 drop-shadow-md" />
+              <h2 className="text-[15px] font-semibold text-slate-600">OpenPose</h2>
+            </div>
+            
+            {/* MediaPipe (El más grande) */}
+            <div className="flex flex-col items-center transform hover:-translate-y-2 transition-transform scale-110 lg:scale-125 z-10 mx-2">
+              <img src={mediapipe} alt="MediaPipe" className="w-32 md:w-40 object-contain mb-2 drop-shadow-xl" />
+              {/* ¡AQUÍ ESTÁ LA ETIQUETA QUE FALTABA! */}
+              <h2 className="text-[16px] font-bold text-slate-700">MediaPipe</h2>
+            </div>
+            
+            {/* Yolo */}
+            <div className="flex flex-col items-center transform hover:-translate-y-2 transition-transform">
+              <img src={yolo} alt="Yolo" className="w-24 md:w-28 object-contain mb-3 drop-shadow-md" />
+              <h2 className="text-[15px] font-semibold text-slate-600">Yolo</h2>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* --- MODAL TUTORIAL (Estilo Modernizado) --- */}
       {showTutorialModal && (
-        <div id='modal_first_session' className='modal_first_session'>
-          <div className='modal_first_session_sub'>
-            <div className='bg_blur'></div>
-            <img className='tutorial-img' src='/assets/say_hi_tutorial.gif' alt='Tutorial' />
-            <div className='content_modal_first_step'>
-              <h1>Bienvenido <span id='userTutorial' className='userTutorial'>{userName}</span></h1>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl flex flex-col md:flex-row overflow-hidden animate-fade-in-up">
+            
+            {/* Lado izquierdo GIF */}
+            <div className="w-full md:w-2/5 bg-indigo-50 flex items-center justify-center p-8">
+               {/* Si tu ruta de GIF es diferente, asegúrate de ajustarla aquí */}
+              <img src="/assets/say_hi_tutorial.gif" alt="Tutorial" className="w-full max-w-[200px] object-contain rounded-xl mix-blend-multiply" />
+            </div>
+
+            {/* Lado derecho Formulario */}
+            <div className="w-full md:w-3/5 p-8 md:p-12 flex flex-col justify-center">
+              <h1 className="text-3xl font-bold text-slate-800 mb-2">
+                Bienvenido, <span id="userTutorial" className="text-blue-600">{userName}</span>
+              </h1>
+              <h3 className="text-slate-500 mb-8 font-medium">Antes de continuar, completemos esto:</h3>
               
-              <div className='content_form'>
-                <h3>Antes de continuar, completemos esto:</h3>
-                <div className='content_elements'>
-                  <label>¿Dónde guardaremos tus imágenes?</label>
-                  <p>Crea una carpeta en tu equipo y pega la ruta aqui</p>
-                  <input type='text' id='txtPath' placeholder='C:\ ruta_a_tu_carpeta' />
-
-                  <label>¿Cada cuántos frames desea obtener una imagen?</label>
-                  <p>Puedes elegir entre 1 - 24 FPS <strong>(Frames Por Segundo)</strong></p>
-                  <input type='number' id='txtFPS' placeholder='Elige un valor' min='1' max='24' />
-
-                  <div className='content_button'>
-                    <button type='button' className='button_first_tutorial' onClick={saveFirstTutorial}>Continuar</button>
-                  </div>
+              <div className="space-y-6">
+                
+                {/* Input Ruta */}
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">¿Dónde guardaremos tus imágenes?</label>
+                  <p className="text-xs text-slate-500 mb-2">Crea una carpeta en tu equipo y pega la ruta aquí.</p>
+                  <input 
+                    type="text" 
+                    id="txtPath" 
+                    placeholder="Ej: C:\Users\Documentos\BioPose" 
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-700"
+                  />
                 </div>
+
+                {/* Input FPS */}
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">¿Cada cuántos frames desea obtener una imagen?</label>
+                  <p className="text-xs text-slate-500 mb-2">Puedes elegir entre 1 y 24 FPS (Frames Por Segundo).</p>
+                  <input 
+                    type="number" 
+                    id="txtFPS" 
+                    min="1" 
+                    max="24"
+                    placeholder="Ej: 5" 
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-700"
+                  />
+                </div>
+
+                {/* Botón */}
+                <button 
+                  type="button" 
+                  onClick={saveFirstTutorial}
+                  className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-500/20 transition-all mt-4"
+                >
+                  Continuar al Dashboard
+                </button>
+
               </div>
             </div>
           </div>
         </div>
       )}
-    </section>
+
+    </div>
   );
 };
 
