@@ -18,7 +18,6 @@ export const useCargaImagen = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Cargar rutas desde el backend asociadas a la empresa del usuario
   useEffect(() => {
     const cargarRutas = async () => {
       const token = localStorage.getItem('token');
@@ -58,7 +57,6 @@ export const useCargaImagen = () => {
     setIsPreviewModalOpen(true);
   };
 
-  // PASO 1 y 2: Sube la imagen y procesa la pose (Solo en el Back interno)
   const handleGeneratePose = async () => {
     if (!file) return;
     if (!selectedPath) {
@@ -79,7 +77,6 @@ export const useCargaImagen = () => {
       if (!uploadedImageId) throw new Error('No se recibió ID de imagen subida');
       setImageId(uploadedImageId);
 
-      // El procesamiento ya no escribe en el disco local automáticamente
       const resProcess = await api.post(`/api/analysis/pose/image/${uploadedImageId}/process/`, {});
       setPoseResults(resProcess);
       setIsPoseModalOpen(true);
@@ -91,7 +88,6 @@ export const useCargaImagen = () => {
     }
   };
 
-  // PASO 3: Exportación física bajo demanda (Botón Guardar Resultados)
   const handleSaveResults = async () => {
     if (!selectedPath || !imageId || !poseResults) {
       alert("Faltan datos de configuración o análisis previo para guardar.");
@@ -104,7 +100,7 @@ export const useCargaImagen = () => {
         results: poseResults
       });
       alert("¡Dataset exportado y guardado exitosamente en la carpeta seleccionada!");
-      setIsPoseModalOpen(false); // Cerramos el modal tras guardar con éxito
+      setIsPoseModalOpen(false); 
     } catch (error: any) {
       console.error("Error al exportar a disco:", error);
       alert("Error al intentar escribir los archivos en la ruta especificada.");
@@ -112,26 +108,12 @@ export const useCargaImagen = () => {
   };
 
   return {
-    file,
-    imageUrl,
-    width,
-    setWidth,
-    height,
-    setHeight,
-    isProcessing,
-    isPreviewModalOpen,
-    setIsPreviewModalOpen,
-    isPoseModalOpen,
-    setIsPoseModalOpen,
-    poseResults,
-    imageId,
-    selectedPath,
-    setSelectedPath,
-    paths,
-    fileInputRef,
-    handleFileChange,
-    handleProcessClick,
-    handleGeneratePose,
-    handleSaveResults
+    file, imageUrl, width, setWidth, height, setHeight,
+    isProcessing, isPreviewModalOpen, setIsPreviewModalOpen,
+    isPoseModalOpen, setIsPoseModalOpen,
+    poseResults, setPoseResults, // <--- EXPORTADO AQUÍ PARA PERMITIR EDICIÓN
+    imageId, selectedPath, setSelectedPath, paths,
+    fileInputRef, handleFileChange, handleProcessClick,
+    handleGeneratePose, handleSaveResults
   };
 };
