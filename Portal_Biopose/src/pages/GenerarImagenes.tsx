@@ -10,7 +10,8 @@ const GenerarImagenes = () => {
     file, videoUrl, fps, setFps, width, setWidth, height, setHeight,
     isProcessing, isModalOpen, setIsModalOpen,
     keypointsData, resultsData, fileInputRef,
-    handleFileChange, handleGenerateImages, handleReuploadClick
+    handleFileChange, handleGenerateImages, handleReuploadClick,
+    selectedPath, setSelectedPath, paths, handleSaveResults // <-- AGREGAR AQUÍ
   } = useGenerarImagenes();
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -134,11 +135,22 @@ const GenerarImagenes = () => {
           <div className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Elije la ruta de guardado:</label>
-              <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                <option value="">Selecciona una carpeta...</option>
-                <option value="1">/videos/test1</option>
-                <option value="2">/videos/training</option>
-              </select>
+                <select 
+                  value={selectedPath} 
+                  onChange={(e) => setSelectedPath(e.target.value)} 
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="">Selecciona una carpeta...</option>
+                  {paths.length > 0 ? (
+                    paths.map((route: any) => (
+                      <option key={route.codigo} value={route.valor}>
+                        {route.valor}
+                      </option>
+                    ))
+                  ) : (
+                    <option disabled>No hay rutas disponibles</option>
+                  )}
+                </select>
             </div>
 
             <div>
@@ -321,21 +333,21 @@ const GenerarImagenes = () => {
                 )}
 
                 <div className="flex flex-col gap-3 mt-auto">
-                  <button 
-                    onClick={handleDownloadFrame} 
-                    disabled={!keypointsData || keypointsData.length === 0} 
-                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm"
-                  >
-                    <Download className="w-5 h-5" /> Guardar Fotograma
-                  </button>
-                  
-                  <button 
-                    onClick={() => setIsModalOpen(false)} 
-                    className="w-full py-3 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md font-medium transition-colors"
-                  >
-                    Cerrar Galería
-                  </button>
-                </div>
+                <button 
+                  onClick={handleSaveResults} // <-- CAMBIADO A handleSaveResults
+                  disabled={!keypointsData || keypointsData.length === 0} 
+                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm"
+                >
+                  <CloudUpload className="w-5 h-5" /> Guardar Colección (JSON + Imágenes)
+                </button>
+                
+                <button 
+                  onClick={() => setIsModalOpen(false)} 
+                  className="w-full py-3 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md font-medium transition-colors"
+                >
+                  Cerrar Galería
+                </button>
+              </div>
               </div>
             </div>
           </div>

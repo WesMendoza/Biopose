@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import api from '../lib/api';
+import { jwtDecode } from 'jwt-decode';
 
 export const useCargaImagen = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -12,18 +13,33 @@ export const useCargaImagen = () => {
   const [poseResults, setPoseResults] = useState<any>(null);
   const [imageId, setImageId] = useState<number | null>(null);
   
-  // NUEVO: Estado para las rutas dinámicas
   const [selectedPath, setSelectedPath] = useState('');
   const [paths, setPaths] = useState<any[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // NUEVO: Cargar rutas desde localStorage al iniciar
+  // Cargar rutas desde el backend asociadas a la empresa del usuario
   useEffect(() => {
-    const savedRoutes = localStorage.getItem('biopose_routes');
-    if (savedRoutes) {
-      setPaths(JSON.parse(savedRoutes));
-    }
+    const cargarRutas = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      
+      try {
+        const decoded: any = jwtDecode(token);
+        const idEmpresa = decoded.idEmpresa;
+        
+        const response = await api.get(`/api/menuOpciones/rutas/configurar/?idEmpresa=${idEmpresa}`);
+        if (Array.isArray(response)) {
+            const soloSubRutas = response.filter((item: any) => 
+                item.codigo && item.codigo.startsWith('SUBRUTA_')
+            );
+            setPaths(soloSubRutas);
+        }
+      } catch (error) {
+        console.error("Error al cargar rutas:", error);
+      }
+    };
+    cargarRutas();
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,25 +58,28 @@ export const useCargaImagen = () => {
     setIsPreviewModalOpen(true);
   };
 
+  // PASO 1 y 2: Sube la imagen y procesa la pose (Solo en el Back interno)
   const handleGeneratePose = async () => {
     if (!file) return;
+    if (!selectedPath) {
+      alert("Por favor selecciona una ruta de guardado antes de procesar.");
+      return;
+    }
+
     setIsPreviewModalOpen(false);
     setIsProcessing(true);
 
     const fd = new FormData();
     fd.append('image', file);
-    // Si en el futuro tu backend necesita guardar la imagen en la ruta específica:
-    // fd.append('ruta_id', selectedPath);
 
     try {
-      // PASO 1: Subir imagen
       const resUpload = await api.postForm('/api/analysis/media/images/upload/', fd);
       const uploadedImageId = resUpload?.idImageUpload || resUpload?.detalle?.idImageUpload;
       
       if (!uploadedImageId) throw new Error('No se recibió ID de imagen subida');
       setImageId(uploadedImageId);
 
-      // PASO 2: Procesar con YOLO para detectar pose
+      // El procesamiento ya no escribe en el disco local automáticamente
       const resProcess = await api.post(`/api/analysis/pose/image/${uploadedImageId}/process/`, {});
       setPoseResults(resProcess);
       setIsPoseModalOpen(true);
@@ -69,6 +88,26 @@ export const useCargaImagen = () => {
       console.error(error);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  // PASO 3: Exportación física bajo demanda (Botón Guardar Resultados)
+  const handleSaveResults = async () => {
+    if (!selectedPath || !imageId || !poseResults) {
+      alert("Faltan datos de configuración o análisis previo para guardar.");
+      return;
+    }
+
+    try {
+      await api.post(`/api/analysis/pose/image/${imageId}/save-to-disk/`, {
+        target_path: selectedPath,
+        results: poseResults
+      });
+      alert("¡Dataset exportado y guardado exitosamente en la carpeta seleccionada!");
+      setIsPoseModalOpen(false); // Cerramos el modal tras guardar con éxito
+    } catch (error: any) {
+      console.error("Error al exportar a disco:", error);
+      alert("Error al intentar escribir los archivos en la ruta especificada.");
     }
   };
 
@@ -86,12 +125,13 @@ export const useCargaImagen = () => {
     setIsPoseModalOpen,
     poseResults,
     imageId,
-    selectedPath,     // <-- Exportamos la ruta seleccionada
-    setSelectedPath,  // <-- Exportamos el actualizador
-    paths,            // <-- Exportamos la lista de rutas
+    selectedPath,
+    setSelectedPath,
+    paths,
     fileInputRef,
     handleFileChange,
     handleProcessClick,
-    handleGeneratePose
+    handleGeneratePose,
+    handleSaveResults
   };
 };

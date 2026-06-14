@@ -30,69 +30,37 @@ const VideoDetection = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const parseKeypoints = (raw: any): Array<{ x: number; y: number; score?: number }> => {
-    if (!raw) return [];
-    if (Array.isArray(raw)) {
-      if (raw.length === 0) return [];
-      if (typeof raw[0] === 'number' && raw.length >= 2) {
-        return [{ x: raw[0], y: raw[1], score: raw[2] ?? 1 }];
-      }
-      return raw.flatMap(parseKeypoints);
-    }
-    if (typeof raw === 'object' && raw !== null) {
-      if (typeof raw.x === 'number' && typeof raw.y === 'number') {
-        return [{ x: raw.x, y: raw.y, score: raw.score ?? 1 }];
-      }
-      if (Array.isArray(raw.keypoints)) {
-        return parseKeypoints(raw.keypoints);
-      }
-      if (Array.isArray(raw.persons)) {
-        return raw.persons.flatMap(parseKeypoints);
-      }
-      if (Array.isArray(raw.frames)) {
-        return parseKeypoints(raw.frames);
-      }
-    }
-    return [];
-  };
-
-  const getFrameData = () => {
-    if (!keypointsData || !videoRef.current) return null;
-
-    const frames = keypointsData.frames || keypointsData;
-    if (!Array.isArray(frames)) return frames;
+  // 1. Obtiene las detecciones exactas para el segundo actual del video
+  const getClosestDetections = () => {
+    if (!keypointsData || !videoRef.current) return [];
 
     const currentTime = videoRef.current.currentTime;
-    const hasTimestamp = frames.some((frame: any) => typeof frame?.timestamp === 'number' || typeof frame?.time === 'number');
+    let minDiff = Infinity;
+    let closestTime = -1;
 
-    if (hasTimestamp) {
-      const timeKey = frames[0]?.timestamp !== undefined ? 'timestamp' : 'time';
-      let bestFrame = frames[0];
-      let bestDiff = Infinity;
-
-      frames.forEach((frame: any) => {
-        const value = frame?.[timeKey];
-        if (typeof value === 'number') {
-          const diff = Math.abs(value - currentTime);
-          if (diff < bestDiff) {
-            bestDiff = diff;
-            bestFrame = frame;
-          }
-        }
-      });
-
-      return bestFrame;
+    // Buscar el timestamp_sec del JSON que más se acerque al tiempo actual del video
+    for (const frame of keypointsData) {
+      const diff = Math.abs(frame.timestamp_sec - currentTime);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestTime = frame.timestamp_sec;
+      }
     }
 
-    const index = Math.min(Math.max(Math.floor(currentTime * 30), 0), frames.length - 1);
-    return frames[index] || frames[0];
+    // Si el video saltó mucho o se desincronizó por más de 0.5s, no dibujamos
+    if (minDiff > 0.5) return [];
+
+    // Retorna todos los registros (personas) que coincidan con ese tiempo
+    return keypointsData.filter((frame: any) => frame.timestamp_sec === closestTime);
   };
 
+  // 2. Dibuja los puntos y líneas sobre el canvas transparente
   const drawOverlay = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || !keypointsData) return;
 
+    // Alinea el canvas al tamaño visual del video en la pantalla
     const rect = video.getBoundingClientRect();
     canvas.width = rect.width;
     canvas.height = rect.height;
@@ -102,31 +70,59 @@ const VideoDetection = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Limpia el dibujo anterior
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (!video.videoWidth || !video.videoHeight) return;
 
+    // Escala para mapear las coordenadas originales a la resolución actual de la pantalla
     const scaleX = canvas.width / video.videoWidth;
     const scaleY = canvas.height / video.videoHeight;
-    const frameData = getFrameData();
-    const points = parseKeypoints(frameData);
 
-    points.forEach((point) => {
-      const x = point.x * scaleX;
-      const y = point.y * scaleY;
+    const currentDetections = getClosestDetections();
 
-      ctx.beginPath();
-      ctx.arc(x, y, 5, 0, 2 * Math.PI);
-      ctx.fillStyle = 'rgba(16,185,129,0.9)';
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
+    currentDetections.forEach((person: any) => {
+      const points = person.keypoints_json;
+      if (!points) return;
 
-      if (point.score !== undefined) {
-        ctx.fillStyle = 'rgba(255,255,255,0.85)';
-        ctx.font = '10px monospace';
-        ctx.fillText(point.score.toFixed(2), x + 6, y - 6);
-      }
+      // Conexiones anatómicas del formato COCO (YOLO)
+      const skeletonConnections = [
+        [5, 7], [7, 9], [6, 8], [8, 10], // Brazos
+        [11, 13], [13, 15], [12, 14], [14, 16], // Piernas
+        [5, 6], [11, 12], [5, 11], [6, 12], // Torso central
+        [0, 1], [0, 2], [1, 3], [2, 4] // Rostro
+      ];
+
+      // Dibujar líneas del esqueleto
+      ctx.strokeStyle = 'rgba(16, 185, 129, 0.8)'; // Verde esmeralda
+      ctx.lineWidth = 2.5;
+      skeletonConnections.forEach(([p1, p2]) => {
+        const pt1 = points.find((p: any) => p.id === p1);
+        const pt2 = points.find((p: any) => p.id === p2);
+        
+        // Dibuja la línea solo si ambos puntos tienen buena confianza
+        if (pt1 && pt2 && pt1.confidence > 0.4 && pt2.confidence > 0.4) {
+          ctx.beginPath();
+          ctx.moveTo(pt1.x * scaleX, pt1.y * scaleY);
+          ctx.lineTo(pt2.x * scaleX, pt2.y * scaleY);
+          ctx.stroke();
+        }
+      });
+
+      // Dibujar las articulaciones (puntos rojos)
+      points.forEach((point: any) => {
+        if (point.confidence > 0.4) {
+          const x = point.x * scaleX;
+          const y = point.y * scaleY;
+
+          ctx.beginPath();
+          ctx.arc(x, y, 4, 0, 2 * Math.PI);
+          ctx.fillStyle = 'rgba(239, 68, 68, 1)';
+          ctx.fill();
+          ctx.strokeStyle = 'white';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+      });
     });
   };
 
@@ -288,7 +284,7 @@ const VideoDetection = () => {
           <div className="grow bg-gray-100 rounded-md flex items-center justify-center overflow-hidden relative min-h-[18.75rem]">
             {videoUrl ? (
               <video 
-                src={videoUrl || undefined} // <-- CORREGIDO: Evita el tipo 'null' asignando 'undefined'
+                src={videoUrl || undefined}
                 controls 
                 className="w-full h-full object-contain bg-black"
               />

@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { CheckCircle, CloudUpload, Image as ImageIcon, Loader, Settings, X, ZoomIn, ZoomOut, Maximize, AlertCircle, User, Info } from 'lucide-react';
-import { API_BASE } from '../config';
 import { useCargaImagen } from '../hooks/useCargaImagen';
 
-// 1. DICCIONARIO DE NOMBRES INTUITIVOS
 const KEYPOINT_NAMES: Record<number, string> = {
   0: "Nariz", 1: "Ojo Izquierdo", 2: "Ojo Derecho", 3: "Oreja Izquierda", 4: "Oreja Derecha",
   5: "Hombro Izquierdo", 6: "Hombro Derecho", 7: "Codo Izquierdo", 8: "Codo Derecho",
@@ -11,12 +9,11 @@ const KEYPOINT_NAMES: Record<number, string> = {
   13: "Rodilla Izquierda", 14: "Rodilla Derecha", 15: "Tobillo Izquierdo", 16: "Tobillo Derecho"
 };
 
-// 2. CONEXIONES DEL ESQUELETO (Para dibujar las líneas)
 const POSE_CONNECTIONS = [
-  [0, 1], [0, 2], [1, 3], [2, 4], // Cabeza y rostro
-  [5, 6], [5, 7], [7, 9], [6, 8], [8, 10], // Brazos y hombros
-  [5, 11], [6, 12], [11, 12], // Torso
-  [11, 13], [13, 15], [12, 14], [14, 16] // Piernas
+  [0, 1], [0, 2], [1, 3], [2, 4],
+  [5, 6], [5, 7], [7, 9], [6, 8], [8, 10],
+  [5, 11], [6, 12], [11, 12],
+  [11, 13], [13, 15], [12, 14], [14, 16]
 ];
 
 const CargaImagen = () => {
@@ -27,7 +24,8 @@ const CargaImagen = () => {
     isPoseModalOpen, setIsPoseModalOpen,
     poseResults, fileInputRef,
     handleFileChange, handleProcessClick, handleGeneratePose,
-    selectedPath, setSelectedPath, paths
+    selectedPath, setSelectedPath, paths,
+    handleSaveResults
   } = useCargaImagen();
 
   const [selectedKp, setSelectedKp] = useState<number | null>(null);
@@ -65,7 +63,6 @@ const CargaImagen = () => {
 
   const handleMouseUp = () => setIsDragging(false);
 
-  // --- FILTRO INTELIGENTE ---
   const currentPerson = poseResults?.persons?.[selectedPersonIndex];
   const validKeypoints = currentPerson?.keypoints?.filter((kp: any) => {
     const isOriginZero = kp.x === 0 && kp.y === 0;
@@ -77,7 +74,6 @@ const CargaImagen = () => {
     <div className="p-8 max-w-7xl mx-auto font-sans">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Carga de Imagen</h1>
 
-      {/* --- PANELES DE CONFIGURACIÓN Y SUBIDA --- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100 flex flex-col">
           <h4 className="text-lg font-semibold text-gray-700 flex items-center mb-4">
@@ -88,11 +84,21 @@ const CargaImagen = () => {
           <div className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Elije la ruta de guardado:</label>
-              <select value={selectedPath} onChange={(e) => setSelectedPath(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+              <select 
+                value={selectedPath} 
+                onChange={(e) => setSelectedPath(e.target.value)} 
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+              >
                 <option value="">Selecciona una carpeta...</option>
-                {paths.map((route: any) => (
-                  <option key={route.id} value={route.directory}>{route.directory}</option>
-                ))}
+                {paths.length > 0 ? (
+                  paths.map((route: any) => (
+                    <option key={route.codigo} value={route.valor}>
+                      {route.valor}
+                    </option>
+                  ))
+                ) : (
+                  <option disabled>No hay rutas disponibles</option>
+                )}
               </select>
             </div>
             <div className="bg-indigo-50 p-4 rounded-md border border-indigo-100">
@@ -138,7 +144,6 @@ const CargaImagen = () => {
         </div>
       </div>
 
-      {/* --- MODAL DE CONFIRMACIÓN PREVIA --- */}
       {isPreviewModalOpen && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
@@ -157,7 +162,6 @@ const CargaImagen = () => {
         </div>
       )}
 
-      {/* --- MODAL DE RESULTADOS --- */}
       {isPoseModalOpen && poseResults && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-[1400px] flex flex-col h-[95vh] overflow-hidden">
@@ -168,8 +172,6 @@ const CargaImagen = () => {
             </div>
             
             <div className="flex-grow flex flex-col lg:flex-row overflow-hidden">
-              
-              {/* === VISOR DE IMAGEN (Imagen Limpia + SVG Dinámico) === */}
               <div 
                 className="lg:w-3/5 relative bg-[#0f172a] overflow-hidden flex items-center justify-center border-r border-gray-200"
                 onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
@@ -198,11 +200,8 @@ const CargaImagen = () => {
                     draggable="false"
                   />
 
-                  {/* CAPA DE DIBUJO SVG (Dibuja SOLO a la persona seleccionada) */}
                   {naturalSize.w > 0 && validKeypoints.length > 0 && (
                     <svg viewBox={`0 0 ${naturalSize.w} ${naturalSize.h}`} className="absolute inset-0 w-full h-full pointer-events-none">
-                      
-                      {/* 1. Dibujar el Esqueleto (Huesos) */}
                       {POSE_CONNECTIONS.map(([id1, id2], idx) => {
                         const kp1 = validKeypoints.find((k: any) => k.id === id1);
                         const kp2 = validKeypoints.find((k: any) => k.id === id2);
@@ -212,7 +211,7 @@ const CargaImagen = () => {
                               key={`bone-${idx}`} 
                               x1={kp1.x} y1={kp1.y} 
                               x2={kp2.x} y2={kp2.y} 
-                              stroke="#0ea5e9" // Color celeste para los huesos
+                              stroke="#0ea5e9" 
                               strokeWidth={Math.max(naturalSize.w / 400, 2)} 
                               strokeOpacity="0.8"
                             />
@@ -221,19 +220,17 @@ const CargaImagen = () => {
                         return null;
                       })}
 
-                      {/* 2. Dibujar las Articulaciones (Puntos) */}
                       {validKeypoints.map((kp: any) => (
                         <circle 
                           key={`joint-${kp.id}`} 
                           cx={kp.x} cy={kp.y} 
                           r={Math.max(naturalSize.w / 250, 4)} 
-                          fill={selectedKp === kp.id ? "#ef4444" : "#3b82f6"} // Rojo si está seleccionado, azul si no
+                          fill={selectedKp === kp.id ? "#ef4444" : "#3b82f6"} 
                           stroke="#ffffff" 
                           strokeWidth={Math.max(naturalSize.w / 600, 1.5)} 
                         />
                       ))}
 
-                      {/* 3. Efecto Radar para la articulación seleccionada */}
                       {selectedKp !== null && validKeypoints.filter((k: any) => k.id === selectedKp).map((kp: any) => (
                         <g key={`radar-${kp.id}`}>
                           <circle cx={kp.x} cy={kp.y} r={Math.max(naturalSize.w / 40, 15)} className="animate-ping origin-center" fill="none" stroke="#ef4444" strokeWidth={Math.max(naturalSize.w / 300, 2)} />
@@ -244,10 +241,7 @@ const CargaImagen = () => {
                 </div>
               </div>
               
-              {/* === PANEL DERECHO === */}
               <div className="lg:w-2/5 flex flex-col bg-white overflow-hidden shrink-0">
-                
-                {/* 1. INFORMACIÓN GENERAL */}
                 <div className="p-6 pb-4 bg-white border-b border-slate-100 shrink-0">
                   <h3 className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-3 flex items-center">
                     <Info className="w-4 h-4 mr-2" /> Información General
@@ -259,7 +253,6 @@ const CargaImagen = () => {
                   </div>
                 </div>
 
-                {/* 2. SELECTOR MULTI-PERSONA (Pestañas) */}
                 {poseResults?.persons && poseResults.persons.length > 0 && (
                   <div className="bg-slate-50 border-b border-slate-200 px-6 pt-4 pb-0 shrink-0 shadow-inner">
                     <div className="flex items-center justify-between mb-3">
@@ -285,7 +278,6 @@ const CargaImagen = () => {
                   </div>
                 )}
 
-                {/* 3. LISTA DE KEYPOINTS */}
                 <div className="flex-1 overflow-y-auto p-6 flex flex-col custom-scrollbar bg-slate-50/30">
                   {poseResults?.persons && poseResults.persons.length > 0 ? (
                     <div className="flex-grow flex flex-col">
@@ -313,9 +305,7 @@ const CargaImagen = () => {
                               <div className="flex justify-between items-center mb-1.5">
                                 <span className="font-bold text-[13px]">{KEYPOINT_NAMES[kp.id] || `Punto ${kp.id}`}</span>
                                 {kp.confidence && (
-                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                                    selectedKp === kp.id ? 'bg-indigo-500/50 text-indigo-100' : 'bg-slate-100 text-slate-500'
-                                  }`}>
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${selectedKp === kp.id ? 'bg-indigo-500/50 text-indigo-100' : 'bg-slate-100 text-slate-500'}`}>
                                     {(kp.confidence * 100).toFixed(0)}%
                                   </span>
                                 )}
@@ -344,7 +334,10 @@ const CargaImagen = () => {
                     <button className="flex-1 py-3 border border-red-200 text-red-600 bg-white hover:bg-red-50 rounded-xl font-bold transition-colors text-sm shadow-sm" onClick={handleCloseModal}>
                       Descartar Análisis
                     </button>
-                    <button className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-md shadow-indigo-200 hover:shadow-lg text-sm" onClick={handleCloseModal}>
+                    <button 
+                      className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-md shadow-indigo-200 hover:shadow-lg text-sm" 
+                      onClick={handleSaveResults} // Vinculado a la persistencia en disco
+                    >
                       Guardar Resultados
                     </button>
                   </div>

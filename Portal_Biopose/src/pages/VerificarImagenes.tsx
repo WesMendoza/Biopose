@@ -1,123 +1,251 @@
-import React from 'react';
-import { Image as ImageIcon, Search, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, AlertCircle, Image as ImageIcon, ZoomIn, ZoomOut, Maximize, User, Info, Loader } from 'lucide-react';
 import { useVerificarImagenes } from '../hooks/useVerificarImagenes';
+
+// DICCIONARIOS DE CONEXIÓN
+const KEYPOINT_NAMES: Record<number, string> = {
+  0: "Nariz", 1: "Ojo Izquierdo", 2: "Ojo Derecho", 3: "Oreja Izquierda", 4: "Oreja Derecha",
+  5: "Hombro Izquierdo", 6: "Hombro Derecho", 7: "Codo Izquierdo", 8: "Codo Derecho",
+  9: "Muñeca Izquierda", 10: "Muñeca Derecha", 11: "Cadera Izquierda", 12: "Cadera Derecha",
+  13: "Rodilla Izquierda", 14: "Rodilla Derecha", 15: "Tobillo Izquierdo", 16: "Tobillo Derecho"
+};
+const POSE_CONNECTIONS = [
+  [0, 1], [0, 2], [1, 3], [2, 4], [5, 6], [5, 7], [7, 9], [6, 8], [8, 10], [5, 11], [6, 12], [11, 12], [11, 13], [13, 15], [12, 14], [14, 16]
+];
 
 const VerificarImagenes = () => {
   const {
-    selectedPath, setSelectedPath,
-    selectedFile, setSelectedFile,
-    imageUrl,
-    errorPath, setErrorPath,
-    errorFile, setErrorFile,
-    paths,
-    availableFiles,
-    handleLoadImage
+    selectedPath, setSelectedPath, selectedFile, setSelectedFile,
+    imageUrl, errorPath, setErrorPath, errorFile, setErrorFile,
+    paths, availableFiles, poseResults, isLoading, handleLoadImage
   } = useVerificarImagenes();
 
+  // Estados interactivos para el SVG y zoom
+  const [selectedKp, setSelectedKp] = useState<number | null>(null);
+  const [selectedPersonIndex, setSelectedPersonIndex] = useState<number>(0);
+  const [naturalSize, setNaturalSize] = useState({ w: 0, h: 0 });
+  const [zoom, setZoom] = useState<number>(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  const handleResetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (zoom <= 1) return;
+    setIsDragging(true); setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  };
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+  };
+  const handleMouseUp = () => setIsDragging(false);
+
+  // Filtro de persona actual
+  const currentPerson = poseResults?.persons?.[selectedPersonIndex];
+  const validKeypoints = currentPerson?.keypoints?.filter((kp: any) => {
+    return !(kp.x === 0 && kp.y === 0) && (kp.confidence === undefined || kp.confidence >= 0.3);
+  }) || [];
+
+  // ======================================================================
+  // MATEMÁTICA ALINEADA CON EL MODAL DE GENERACIÓN DE IMÁGENES
+  // ======================================================================
+  const isVideo = poseResults?.model_used?.includes('Video');
+  
+  // Verificamos si los puntos vienen normalizados (0.0 a 1.0)
+  const isNormalized = validKeypoints.length > 0 && validKeypoints.every((p: any) => p.x <= 1.5 && p.y <= 1.5);
+
+  const getRealCoords = (kpX: number, kpY: number) => {
+    if (naturalSize.w === 0 || naturalSize.h === 0) return { x: kpX, y: kpY };
+
+    if (isVideo) {
+      // 1. Si los puntos están normalizados (0-1), multiplicamos por el ancho/alto real
+      if (isNormalized) {
+        return { 
+          x: kpX * naturalSize.w, 
+          y: kpY * naturalSize.h 
+        };
+      }
+      
+      // 2. Si YOLO devuelve coordenadas absolutas (ej. en base 640x640)
+      // Escalar las coordenadas desde la resolución de procesamiento a la resolución original del fotograma.
+      // Asumimos que la resolución de procesamiento de YOLO fue 640x640 (o puedes ajustarlo).
+      const YOLO_RESOLUTION = 640; 
+      
+      const scaleX = naturalSize.w / YOLO_RESOLUTION;
+      const scaleY = naturalSize.h / YOLO_RESOLUTION;
+
+      return {
+        x: kpX * scaleX,
+        y: kpY * scaleY
+      };
+    }
+
+    // Imágenes normales estáticas
+    return { x: kpX, y: kpY }; 
+  };
+  // ======================================================================
+
   return (
-    <div className="p-8 max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Verificación de Imágenes</h1>
+    <div className="p-8 max-w-[1400px] mx-auto font-sans h-[calc(100vh-4rem)] flex flex-col">
+      <h1 className="text-2xl font-bold text-gray-800 mb-6 shrink-0">Verificación de Dataset</h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* Navigation / Selection Sidebar */}
-        <div className="col-span-1 lg:col-span-4 flex flex-col space-y-6">
-          <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100">
-            <h4 className="text-lg font-semibold text-gray-700 mb-4 flex items-center">
-              <Search className="w-5 h-5 mr-2 text-indigo-500" />
-              Búsqueda de Archivo
-            </h4>
+      {/* TOP BAR: Búsqueda */}
+      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100 mb-6 shrink-0">
+        <h4 className="text-lg font-semibold text-gray-700 mb-4 flex items-center">
+          <Search className="w-5 h-5 mr-2 text-indigo-500" /> Cargar desde Dataset
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Ruta del Dataset</label>
+            <select 
+              className={`w-full px-3 py-2 border rounded-md focus:ring-indigo-500 text-sm ${errorPath ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
+              value={selectedPath} onChange={(e) => { setSelectedPath(e.target.value); setSelectedFile(''); setErrorPath(false); }}
+            >
+              <option value="">Elige una ruta parametrizada</option>
+              {paths.map((p, i) => <option key={i} value={p.id}>{p.name}</option>)}
+            </select>
+            {errorPath && <p className="text-xs text-red-500 mt-1 flex items-center"><AlertCircle className="w-3 h-3 mr-1" /> Requerido</p>}
+          </div>
 
-            <div className="space-y-5">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Selecciona la ruta a cargar
-                </label>
-                <select 
-                  className={`w-full px-3 py-2 border rounded-md focus:ring-indigo-500 text-sm ${
-                    errorPath ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                  }`}
-                  value={selectedPath}
-                  onChange={(e) => {
-                    setSelectedPath(e.target.value);
-                    setSelectedFile('');
-                    setErrorPath(false);
-                  }}
-                >
-                  <option value="">Elige una ruta</option>
-                  {paths.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-                {errorPath && (
-                  <p className="text-xs text-red-500 mt-1 flex items-center">
-                    <AlertCircle className="w-3 h-3 mr-1" /> Debes seleccionar una ruta
-                  </p>
-                )}
-              </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Archivo a inspeccionar</label>
+            <select 
+              className={`w-full px-3 py-2 border rounded-md focus:ring-indigo-500 text-sm ${errorFile ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
+              value={selectedFile} onChange={(e) => { setSelectedFile(e.target.value); setErrorFile(false); }} disabled={!selectedPath}
+            >
+              <option value="">Archivos disponibles...</option>
+              {availableFiles.map((f, i) => <option key={i} value={f.id}>{f.name}</option>)}
+            </select>
+            {errorFile && <p className="text-xs text-red-500 mt-1 flex items-center"><AlertCircle className="w-3 h-3 mr-1" /> Requerido</p>}
+          </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Elige un archivo a cargar
-                </label>
-                <select 
-                  className={`w-full px-3 py-2 border rounded-md focus:ring-indigo-500 text-sm ${
-                    errorFile ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                  }`}
-                  value={selectedFile}
-                  onChange={(e) => {
-                    setSelectedFile(e.target.value);
-                    setErrorFile(false);
-                  }}
-                  disabled={!selectedPath}
-                >
-                  <option value="">Elige un archivo</option>
-                  {availableFiles.map(f => (
-                    <option key={f.id} value={f.id}>{f.name}</option>
-                  ))}
-                </select>
-                {errorFile && (
-                  <p className="text-xs text-red-500 mt-1 flex items-center">
-                    <AlertCircle className="w-3 h-3 mr-1" /> Debes seleccionar un archivo
-                  </p>
-                )}
-              </div>
+          <button 
+            onClick={handleLoadImage} disabled={isLoading}
+            className="w-full flex justify-center items-center px-4 py-2 h-[38px] bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium transition-colors disabled:opacity-50"
+          >
+            {isLoading ? <Loader className="w-5 h-5 animate-spin mr-2" /> : <ImageIcon className="w-5 h-5 mr-2" />}
+            {isLoading ? 'Cargando...' : 'Inspeccionar Archivo'}
+          </button>
+        </div>
+      </div>
 
-              <button 
-                onClick={handleLoadImage}
-                className="w-full flex justify-center items-center px-4 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium transition-colors"
-              >
-                <ImageIcon className="w-5 h-5 mr-2" />
-                Cargar Imagen
-              </button>
+      {/* ÁREA DE VISUALIZACIÓN INTERACTIVA */}
+      {imageUrl ? (
+        <div className="flex-grow flex flex-col lg:flex-row bg-white rounded-lg shadow-md border border-gray-100 overflow-hidden min-h-0">
+          
+          {/* LADO IZQUIERDO: Imagen y SVG */}
+          <div 
+            className="lg:w-3/5 relative bg-[#0f172a] overflow-hidden flex items-center justify-center border-r border-gray-200"
+            onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
+          >
+            <div className="absolute top-4 left-4 z-20 flex bg-white/95 backdrop-blur-md shadow-xl rounded-lg border border-slate-200/50 overflow-hidden">
+              <button onClick={() => setZoom(z => Math.max(0.5, z - 0.2))} className="p-2 hover:bg-slate-100 text-slate-600 transition-colors"><ZoomOut className="w-5 h-5" /></button>
+              <div className="px-3 py-2 border-x border-slate-200/50 text-sm font-bold text-slate-700 flex items-center justify-center bg-slate-50/50 min-w-[4rem]">{Math.round(zoom * 100)}%</div>
+              <button onClick={() => setZoom(z => Math.min(5, z + 0.2))} className="p-2 hover:bg-slate-100 text-slate-600 transition-colors"><ZoomIn className="w-5 h-5" /></button>
+              <button onClick={handleResetView} className="p-2 hover:bg-slate-100 text-indigo-600 transition-colors border-l border-slate-200/50"><Maximize className="w-5 h-5" /></button>
+            </div>
+
+            <div 
+              className="relative origin-center inline-block"
+              style={{ 
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+                transitionProperty: 'transform', transitionDuration: isDragging ? '0ms' : '200ms', transitionTimingFunction: 'ease-out'
+              }}
+            >
+              <img 
+                src={imageUrl} alt="Dataset" 
+                className="block max-w-none shadow-2xl rounded-sm pointer-events-none select-none"
+                style={{ maxHeight: '65vh' }}
+                onLoad={(e) => setNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+                draggable="false"
+              />
+
+              {naturalSize.w > 0 && poseResults && validKeypoints.length > 0 && (
+                <svg viewBox={`0 0 ${naturalSize.w} ${naturalSize.h}`} className="absolute inset-0 w-full h-full pointer-events-none">
+                  {POSE_CONNECTIONS.map(([id1, id2], idx) => {
+                    const kp1 = validKeypoints.find((k: any) => k.id === id1);
+                    const kp2 = validKeypoints.find((k: any) => k.id === id2);
+                    if (kp1 && kp2) {
+                      const p1 = getRealCoords(kp1.x, kp1.y);
+                      const p2 = getRealCoords(kp2.x, kp2.y);
+                      return <line key={`bone-${idx}`} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="#0ea5e9" strokeWidth={Math.max(naturalSize.w / 400, 2)} strokeOpacity="0.8" />;
+                    }
+                    return null;
+                  })}
+                  {validKeypoints.map((kp: any) => {
+                    const p = getRealCoords(kp.x, kp.y);
+                    return <circle key={`joint-${kp.id}`} cx={p.x} cy={p.y} r={Math.max(naturalSize.w / 250, 4)} fill={selectedKp === kp.id ? "#ef4444" : "#3b82f6"} stroke="#ffffff" strokeWidth={Math.max(naturalSize.w / 600, 1.5)} />;
+                  })}
+                  {selectedKp !== null && validKeypoints.filter((k: any) => k.id === selectedKp).map((kp: any) => {
+                    const p = getRealCoords(kp.x, kp.y);
+                    return <circle key={`radar-${kp.id}`} cx={p.x} cy={p.y} r={Math.max(naturalSize.w / 40, 15)} className="animate-ping origin-center" fill="none" stroke="#ef4444" strokeWidth={Math.max(naturalSize.w / 300, 2)} />;
+                  })}
+                </svg>
+              )}
             </div>
           </div>
-        </div>
-
-        {/* Image Preview Container */}
-        <div className="col-span-1 lg:col-span-8 flex flex-col">
-          <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100 flex-grow flex flex-col items-center justify-center min-h-[400px] relative">
-            <div className="absolute top-4 left-6">
-              <span className="text-sm font-medium text-gray-500">Previsualización</span>
-            </div>
-            
-            {imageUrl ? (
-              <img 
-                src={imageUrl} 
-                alt="Resultado de la verificación" 
-                className="max-h-[500px] w-auto object-contain rounded-md shadow-sm border border-gray-200 mt-6"
-              />
-            ) : (
-              <div className="flex flex-col items-center text-center px-4">
-                <ImageIcon className="w-20 h-20 text-gray-300 mb-4 opacity-50" />
-                <h3 className="text-xl font-medium text-gray-600 mb-2">Selecciona primero una imagen...</h3>
-                <p className="text-sm text-gray-400">Utiliza el panel lateral para elegir una ruta y un archivo a visualizar.</p>
+          
+          {/* LADO DERECHO: Detalles (Solo si hay JSON) */}
+          <div className="lg:w-2/5 flex flex-col overflow-hidden bg-white">
+            {!poseResults ? (
+              <div className="p-8 h-full flex flex-col items-center justify-center text-center">
+                <AlertCircle className="w-16 h-16 text-orange-200 mb-4" />
+                <h3 className="text-xl font-bold text-gray-700">Sin Datos de Análisis</h3>
+                <p className="text-gray-500 mt-2">Esta imagen no tiene un archivo JSON de resultados asociado en su directorio local.</p>
               </div>
+            ) : (
+              <>
+                <div className="p-4 bg-white border-b border-slate-100 shrink-0">
+                  <h3 className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-2 flex items-center"><Info className="w-4 h-4 mr-2" /> Datos Generales</h3>
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-1 text-sm text-slate-600">
+                    <p className="flex justify-between"><span>Modelo:</span> <strong className="text-slate-800">{poseResults.model_used || 'N/A'}</strong></p>
+                    <p className="flex justify-between"><span>Sujetos:</span> <strong className="text-slate-800">{poseResults.persons_detected || 0}</strong></p>
+                  </div>
+                </div>
+
+                {poseResults.persons?.length > 0 && (
+                  <div className="bg-slate-50 border-b border-slate-200 px-4 pt-3 pb-0 shrink-0">
+                    <h3 className="text-sm font-bold text-slate-700 flex items-center mb-2"><User className="w-4 h-4 mr-2 text-indigo-500" /> Sujetos Detectados</h3>
+                    <div className="flex overflow-x-auto gap-2 pb-2">
+                      {poseResults.persons.map((_: any, index: number) => (
+                        <button key={index} onClick={() => { setSelectedPersonIndex(index); setSelectedKp(null); }} className={`px-3 py-1.5 rounded-t-md font-semibold text-xs transition-all border-b-2 ${selectedPersonIndex === index ? 'bg-white text-indigo-700 border-indigo-600' : 'bg-transparent text-slate-500 border-transparent hover:bg-slate-200'}`}>Persona {index + 1}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-slate-50/30">
+                  {validKeypoints.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-2">
+                      {validKeypoints.map((kp: any) => {
+                        const p = getRealCoords(kp.x, kp.y);
+                        return (
+                          <div key={kp.id} onClick={() => setSelectedKp(kp.id)} className={`p-2 rounded-lg border flex flex-col cursor-pointer transition-all ${selectedKp === kp.id ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-white text-slate-700 hover:bg-indigo-50 border-slate-200'}`}>
+                            <div className="flex justify-between items-center">
+                              <span className="font-bold text-[12px]">{KEYPOINT_NAMES[kp.id] || `Punto ${kp.id}`}</span>
+                              {kp.confidence !== undefined && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${selectedKp === kp.id ? 'bg-indigo-500/50 text-indigo-100' : 'bg-slate-100 text-slate-500'}`}>{(kp.confidence * 100).toFixed(0)}%</span>}
+                            </div>
+                            <span className={`text-[10px] mt-1 ${selectedKp === kp.id ? 'text-indigo-200' : 'text-slate-400'}`}>Eje X: {Math.round(p.x)} | Eje Y: {Math.round(p.y)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                     <div className="text-center p-6 text-sm text-gray-400">Selecciona una persona válida para ver sus coordenadas.</div>
+                  )}
+                </div>
+              </>
             )}
           </div>
         </div>
-
-      </div>
+      ) : (
+        <div className="flex-grow bg-white rounded-lg shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center p-12">
+          <div className="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center mb-4"><ImageIcon className="w-12 h-12 text-indigo-200" /></div>
+          <h3 className="text-xl font-medium text-gray-600 mb-2">Visor de Datasets</h3>
+          <p className="text-sm text-gray-400 max-w-md">Selecciona una ruta en el panel superior para cargar las imágenes y revisar cómo quedó la extracción de Keypoints.</p>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import api from '../lib/api';
+import { jwtDecode } from 'jwt-decode';
 
 export const useGenerarImagenes = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -12,12 +13,46 @@ export const useGenerarImagenes = () => {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // NUEVO: Guardamos el JSON con los puntos y los datos
   const [keypointsData, setKeypointsData] = useState<any[]>([]);
   const [resultsData, setResultsData] = useState<any>(null);
+  const [videoId, setVideoId] = useState<number | null>(null); // NUEVO: Para guardar el ID
+
+  // ESTADOS DINÁMICOS
+  const [selectedPath, setSelectedPath] = useState('');
+  const [paths, setPaths] = useState<any[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // NUEVO: Cargar rutas y FPS desde el backend
+  useEffect(() => {
+    const cargarConfiguracion = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      
+      try {
+        const decoded: any = jwtDecode(token);
+        const idEmpresa = decoded.idEmpresa;
+        
+        const response = await api.get(`/api/menuOpciones/rutas/configurar/?idEmpresa=${idEmpresa}`);
+        
+        if (Array.isArray(response)) {
+            // Filtrar rutas
+            const soloSubRutas = response.filter((item: any) => item.codigo && item.codigo.startsWith('SUBRUTA_'));
+            setPaths(soloSubRutas);
+            
+            // Buscar FPS por defecto
+            const fpsConfig = response.find((item: any) => item.codigo === 'FPS_DEFAULT');
+            if (fpsConfig) {
+                setFps(Number(fpsConfig.valor));
+            }
+        }
+      } catch (error) {
+        console.error("Error al cargar configuración:", error);
+      }
+    };
+    cargarConfiguracion();
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -28,6 +63,7 @@ export const useGenerarImagenes = () => {
       setKeypointsData([]);
       setResultsData(null);
       setErrorMessage(null);
+      setVideoId(null);
     }
   };
 
@@ -40,6 +76,7 @@ export const useGenerarImagenes = () => {
     setKeypointsData([]);
     setResultsData(null);
     setErrorMessage(null);
+    setVideoId(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -47,6 +84,11 @@ export const useGenerarImagenes = () => {
 
   const handleGenerateImages = async () => {
     if (!file) return;
+    if (!selectedPath) {
+        alert("Por favor selecciona una ruta de guardado antes de procesar.");
+        return;
+    }
+
     setErrorMessage(null);
     setIsProcessing(true);
 
@@ -58,8 +100,8 @@ export const useGenerarImagenes = () => {
       const createdVideoId = resUpload?.idVideoUpload || resUpload?.id || resUpload?.video_id;
 
       if (!createdVideoId) throw new Error('No se recibió el ID del video subido.');
+      setVideoId(createdVideoId); // Guardamos el ID
 
-      // Mandamos a analizar el comportamiento
       await api.post(`/api/analysis/videos/${createdVideoId}/process/`, { fps_skip: fps });
 
       const pollResults = async () => {
@@ -73,7 +115,6 @@ export const useGenerarImagenes = () => {
 
             setResultsData(resStatus.analysis_report || resStatus);
 
-            // ¡CRÍTICO! Pedimos el JSON con las coordenadas para dárselas a React
             try {
               const keypointsRes = await api.get(`/api/analysis/videos/${createdVideoId}/keypoints-json/`);
               const framesData = keypointsRes.keypoints_data || keypointsRes.keypoints || keypointsRes.frames || keypointsRes.data || (Array.isArray(keypointsRes) ? keypointsRes : []);
@@ -88,7 +129,6 @@ export const useGenerarImagenes = () => {
             } catch (err) {
               setErrorMessage("Se completó el análisis pero falló la descarga de coordenadas.");
             }
-
           } else if (currentStatus === 'failed') {
             setIsProcessing(false);
             if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
@@ -112,10 +152,33 @@ export const useGenerarImagenes = () => {
     }
   };
 
+  // NUEVO: Guardar en disco la colección completa
+  const handleSaveResults = async () => {
+    if (!selectedPath || !videoId || keypointsData.length === 0) {
+      alert("Faltan datos para guardar la colección.");
+      return;
+    }
+
+    try {
+      await api.post(`/api/analysis/videos/${videoId}/save-to-disk/`, {
+        target_path: selectedPath,
+        fps_usados: fps,
+        width: width,
+        height: height
+      });
+      alert("¡Colección de fotogramas guardada exitosamente en tu carpeta!");
+      setIsModalOpen(false);
+    } catch (error: any) {
+      console.error("Error al exportar:", error);
+      alert("Error al intentar guardar los archivos en disco.");
+    }
+  };
+
   return {
     file, videoUrl, fps, setFps, width, setWidth, height, setHeight,
     isProcessing, isModalOpen, setIsModalOpen,
     keypointsData, resultsData, errorMessage,
-    fileInputRef, handleFileChange, handleGenerateImages, handleReuploadClick
+    selectedPath, setSelectedPath, paths, // Exportamos configuración
+    fileInputRef, handleFileChange, handleGenerateImages, handleReuploadClick, handleSaveResults
   };
 };
