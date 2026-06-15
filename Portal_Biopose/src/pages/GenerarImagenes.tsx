@@ -17,7 +17,8 @@ const GenerarImagenes = () => {
     isProcessing, isModalOpen, setIsModalOpen,
     keypointsData, setKeypointsData, resultsData, fileInputRef,
     handleFileChange, handleGenerateImages, handleReuploadClick,
-    selectedPath, setSelectedPath, paths, handleSaveResults
+    // selectedPath, setSelectedPath, paths, // === COMENTADO ===
+    handleSaveResults
   } = useGenerarImagenes();
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -37,14 +38,11 @@ const GenerarImagenes = () => {
   const [isDraggingPan, setIsDraggingPan] = useState(false);
   const [dragStartPan, setDragStartPan] = useState({ x: 0, y: 0 });
 
-  // ¡CORRECCIÓN DEL BUG! 
-  // Solo regresamos al índice 0 cuando se ABRE el modal (nuevo video), 
-  // no cada vez que cambia keypointsData por arrastrar un punto.
   useEffect(() => { 
     if (isModalOpen) {
       setCurrentIndex(0); 
     }
-  }, [isModalOpen]); // <- Cambiado: ahora depende de isModalOpen, no de keypointsData
+  }, [isModalOpen]);
 
   // DIBUJAR VIDEO EN CANVAS
   const drawFrameWithSkeletons = useCallback(() => {
@@ -84,7 +82,6 @@ const GenerarImagenes = () => {
   };
 
   const handleMouseMoveSVG = (e: React.MouseEvent) => {
-    // 1. Lógica de mover Puntos
     if (draggedKp !== null && svgRef.current) {
       e.stopPropagation();
       const svg = svgRef.current as any;
@@ -95,7 +92,7 @@ const GenerarImagenes = () => {
       pt.x = e.clientX; pt.y = e.clientY;
       const svgP = pt.matrixTransform(CTM.inverse());
 
-      setKeypointsData(prev => {
+      setKeypointsData((prev: any[]) => {
         const newData = [...prev];
         const frameData = { ...newData[currentIndex] };
 
@@ -131,7 +128,6 @@ const GenerarImagenes = () => {
       return;
     }
 
-    // 2. Lógica de Mover Canvas (Pan)
     if (!isDraggingPan) return;
     setPan({ x: e.clientX - dragStartPan.x, y: e.clientY - dragStartPan.y });
   };
@@ -141,7 +137,6 @@ const GenerarImagenes = () => {
     setDraggedKp(null);
   };
 
-  // DATOS DEL FOTOGRAMA ACTUAL
   const currentFrameData = keypointsData[currentIndex] || {};
   const rawP = currentFrameData.keypoints_json || currentFrameData.keypoints || [];
   const validKeypoints = Array.isArray(rawP) && rawP.length > 0 && Array.isArray(rawP[0]) ? rawP[0] : rawP;
@@ -159,13 +154,9 @@ const GenerarImagenes = () => {
           <h4 className="text-lg font-semibold text-gray-700 flex items-center mb-4"><Settings className="w-5 h-5 mr-2 text-indigo-500" /> Configuración de Extracción</h4>
           <hr className="mb-4 border-gray-200" />
           <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Elije la ruta de guardado:</label>
-                <select value={selectedPath} onChange={(e) => setSelectedPath(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                  <option value="">Selecciona una carpeta...</option>
-                  {paths.length > 0 ? (paths.map((route: any) => (<option key={route.codigo} value={route.valor}>{route.valor}</option>))) : (<option disabled>No hay rutas disponibles</option>)}
-                </select>
-            </div>
+            
+            {/* === COMBOBOX DE RUTAS ELIMINADO/COMENTADO === */}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Imágenes por Segundo (FPS):</label>
               <input type="number" value={fps} onChange={(e) => setFps(Number(e.target.value))} min="1" max="24" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"/>
@@ -321,7 +312,9 @@ const GenerarImagenes = () => {
 
                   <div className="flex flex-col sm:flex-row gap-3 mt-6 pt-5 border-t border-slate-200 shrink-0">
                     <button className="flex-1 py-3 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-xl font-bold transition-colors text-sm shadow-sm" onClick={() => setIsModalOpen(false)}>Descartar y Cerrar</button>
-                    <button className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-md shadow-indigo-200 hover:shadow-lg text-sm" onClick={handleSaveResults}>Guardar Resultados</button>
+                    <button className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-md shadow-indigo-200 hover:shadow-lg text-sm flex justify-center items-center" onClick={handleSaveResults}>
+                      <Download className="w-4 h-4 mr-2" /> Descargar Fotogramas (ZIP)
+                    </button>
                   </div>
                 </div>
               </div>

@@ -13,8 +13,9 @@ export const useCargaImagen = () => {
   const [poseResults, setPoseResults] = useState<any>(null);
   const [imageId, setImageId] = useState<number | null>(null);
   
-  const [selectedPath, setSelectedPath] = useState('');
-  const [paths, setPaths] = useState<any[]>([]);
+  // === RUTAS COMENTADAS ===
+  // const [selectedPath, setSelectedPath] = useState('');
+  // const [paths, setPaths] = useState<any[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -29,10 +30,11 @@ export const useCargaImagen = () => {
         
         const response = await api.get(`/api/menuOpciones/rutas/configurar/?idEmpresa=${idEmpresa}`);
         if (Array.isArray(response)) {
-            const soloSubRutas = response.filter((item: any) => 
-                item.codigo && item.codigo.startsWith('SUBRUTA_')
-            );
-            setPaths(soloSubRutas);
+            // === RUTAS COMENTADAS ===
+            // const soloSubRutas = response.filter((item: any) => 
+            //     item.codigo && item.codigo.startsWith('SUBRUTA_')
+            // );
+            // setPaths(soloSubRutas);
         }
       } catch (error) {
         console.error("Error al cargar rutas:", error);
@@ -59,10 +61,12 @@ export const useCargaImagen = () => {
 
   const handleGeneratePose = async () => {
     if (!file) return;
-    if (!selectedPath) {
-      alert("Por favor selecciona una ruta de guardado antes de procesar.");
-      return;
-    }
+    
+    // === VALIDACIÓN DE RUTA COMENTADA ===
+    // if (!selectedPath) {
+    //   alert("Por favor selecciona una ruta de guardado antes de procesar.");
+    //   return;
+    // }
 
     setIsPreviewModalOpen(false);
     setIsProcessing(true);
@@ -89,21 +93,38 @@ export const useCargaImagen = () => {
   };
 
   const handleSaveResults = async () => {
-    if (!selectedPath || !imageId || !poseResults) {
+    // === VALIDACIÓN MODIFICADA (Ya no exige selectedPath) ===
+    if (!imageId || !poseResults) {
       alert("Faltan datos de configuración o análisis previo para guardar.");
       return;
     }
 
     try {
-      await api.post(`/api/analysis/pose/image/${imageId}/save-to-disk/`, {
-        target_path: selectedPath,
+      // 1. Usamos api.postBlob para descargar el ZIP desde el backend
+      const blob = await api.postBlob(`/api/analysis/pose/image/${imageId}/save-to-disk/`, {
+        // target_path: selectedPath, // YA NO ENVIAMOS ESTO
         results: poseResults
       });
-      alert("¡Dataset exportado y guardado exitosamente en la carpeta seleccionada!");
+      
+      // 2. Creamos una URL temporal
+      const url = window.URL.createObjectURL(blob);
+      
+      // 3. Forzamos la descarga en el navegador
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Dataset_Imagen_${imageId}.zip`);
+      document.body.appendChild(link);
+      link.click();
+      
+      // 4. Limpieza de memoria
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      alert("¡Dataset descargado exitosamente!");
       setIsPoseModalOpen(false); 
     } catch (error: any) {
       console.error("Error al exportar a disco:", error);
-      alert("Error al intentar escribir los archivos en la ruta especificada.");
+      alert("Error al intentar descargar el archivo ZIP.");
     }
   };
 
@@ -111,8 +132,9 @@ export const useCargaImagen = () => {
     file, imageUrl, width, setWidth, height, setHeight,
     isProcessing, isPreviewModalOpen, setIsPreviewModalOpen,
     isPoseModalOpen, setIsPoseModalOpen,
-    poseResults, setPoseResults, // <--- EXPORTADO AQUÍ PARA PERMITIR EDICIÓN
-    imageId, selectedPath, setSelectedPath, paths,
+    poseResults, setPoseResults, 
+    imageId, 
+    // selectedPath, setSelectedPath, paths, // === COMENTADO ===
     fileInputRef, handleFileChange, handleProcessClick,
     handleGeneratePose, handleSaveResults
   };

@@ -46,10 +46,12 @@ export const useConfiguracionRutas = () => {
         } else if (item.codigo === 'FPS_DEFAULT') {
           setFps(Number(item.valor)); 
         } else if (item.codigo.startsWith('SUBRUTA_')) {
+          const fechaDB = item.fechaCreacion || item.fecha_creacion || item.createdAt;
+          const fechaFormateada = fechaDB ? new Date(fechaDB).toLocaleDateString() : 'Sin fecha';
           loadedRoutes.push({
             id: Date.now() + Math.random(), 
             directory: item.valor,
-            createdAt: new Date().toLocaleDateString()
+            createdAt: fechaFormateada 
           });
         }
       });

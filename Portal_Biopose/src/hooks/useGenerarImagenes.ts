@@ -17,8 +17,9 @@ export const useGenerarImagenes = () => {
   const [resultsData, setResultsData] = useState<any>(null);
   const [videoId, setVideoId] = useState<number | null>(null);
 
-  const [selectedPath, setSelectedPath] = useState('');
-  const [paths, setPaths] = useState<any[]>([]);
+  // === RUTAS COMENTADAS ===
+  // const [selectedPath, setSelectedPath] = useState('');
+  // const [paths, setPaths] = useState<any[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -32,8 +33,9 @@ export const useGenerarImagenes = () => {
         const idEmpresa = decoded.idEmpresa;
         const response = await api.get(`/api/menuOpciones/rutas/configurar/?idEmpresa=${idEmpresa}`);
         if (Array.isArray(response)) {
-            const soloSubRutas = response.filter((item: any) => item.codigo && item.codigo.startsWith('SUBRUTA_'));
-            setPaths(soloSubRutas);
+            // === RUTAS COMENTADAS ===
+            // const soloSubRutas = response.filter((item: any) => item.codigo && item.codigo.startsWith('SUBRUTA_'));
+            // setPaths(soloSubRutas);
             const fpsConfig = response.find((item: any) => item.codigo === 'FPS_DEFAULT');
             if (fpsConfig) setFps(Number(fpsConfig.valor));
         }
@@ -60,7 +62,9 @@ export const useGenerarImagenes = () => {
 
   const handleGenerateImages = async () => {
     if (!file) return;
-    if (!selectedPath) { alert("Por favor selecciona una ruta de guardado."); return; }
+    
+    // === VALIDACIÓN DE RUTA COMENTADA ===
+    // if (!selectedPath) { alert("Por favor selecciona una ruta de guardado."); return; }
 
     setErrorMessage(null); setIsProcessing(true);
     const fd = new FormData(); fd.append('video', file);
@@ -113,33 +117,51 @@ export const useGenerarImagenes = () => {
   };
 
   const handleSaveResults = async () => {
-    if (!selectedPath || !videoId || keypointsData.length === 0) {
-      alert("Faltan datos para guardar la colección.");
+    // Validamos solo que haya un ID de video y datos extraídos
+    if (!videoId || keypointsData.length === 0) {
+      alert("Faltan datos para descargar la colección de fotogramas.");
       return;
     }
     try {
-      // AQUÍ ENVIAMOS LOS DATOS MODIFICADOS AL BACKEND
-      await api.post(`/api/analysis/videos/${videoId}/save-to-disk/`, {
-        target_path: selectedPath,
+      alert("Preparando el ZIP de descarga... Esto puede tardar unos segundos dependiendo de la cantidad de frames.");
+      
+      // 1. Usamos nuestro api.postBlob para traer el ZIP
+      const blob = await api.postBlob(`/api/analysis/videos/${videoId}/save-to-disk/`, {
+        // target_path: selectedPath, // YA NO ENVIAMOS ESTO
         fps_usados: fps,
         width: width,
         height: height,
-        results: keypointsData // <--- JSON Modificado
+        results: keypointsData 
       });
-      alert("¡Colección de fotogramas guardada exitosamente en tu carpeta!");
+
+      // 2. Creamos la URL temporal
+      const url = window.URL.createObjectURL(blob);
+      
+      // 3. Forzamos la descarga nativa
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Dataset_VideoFrames_${videoId}.zip`);
+      document.body.appendChild(link);
+      link.click();
+      
+      // 4. Limpiamos la memoria
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      alert("¡Colección de fotogramas descargada exitosamente!");
       setIsModalOpen(false);
     } catch (error: any) {
-      console.error("Error al exportar:", error);
-      alert("Error al intentar guardar los archivos en disco.");
+      console.error("Error al descargar el ZIP:", error);
+      alert("Error al intentar descargar los archivos en formato ZIP.");
     }
   };
 
   return {
     file, videoUrl, fps, setFps, width, setWidth, height, setHeight,
     isProcessing, isModalOpen, setIsModalOpen,
-    keypointsData, setKeypointsData, // <--- EXPORTADO PARA PODER MOVER PUNTOS
+    keypointsData, setKeypointsData, 
     resultsData, errorMessage,
-    selectedPath, setSelectedPath, paths,
+    // selectedPath, setSelectedPath, paths, // === COMENTADO ===
     fileInputRef, handleFileChange, handleGenerateImages, handleReuploadClick, handleSaveResults
   };
 };

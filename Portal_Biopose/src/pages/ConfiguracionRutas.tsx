@@ -22,9 +22,13 @@ const ConfiguracionRutas = () => {
     <div className="p-8 max-w-6xl mx-auto">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Configuración de Archivos</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        {/* Main Path Configuration */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      {/* Cambiamos el grid para que la tarjeta de FPS ocupe un espacio central y no se vea desalineada */}
+      <div className="grid grid-cols-1 md:max-w-2xl gap-6 mb-8">
+        
+        {/* =========================================================
+            SECCIÓN DE PARAMETRIZACIÓN DE RUTAS (COMENTADA) 
+            ========================================================= */}
+        {/* <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h5 className="text-lg font-semibold text-gray-700 mb-4">Parametrización de Rutas</h5>
           <div className="space-y-4">
             <div>
@@ -46,8 +50,9 @@ const ConfiguracionRutas = () => {
             </button>
           </div>
         </div>
+        */}
 
-        {/* FPS Configuration */}
+        {/* FPS Configuration (MANTENIDO Y ACTIVO) */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h5 className="text-lg font-semibold text-gray-700 mb-4">Parametrización de FPS</h5>
           <div className="flex items-center space-x-3 mt-6">
@@ -98,8 +103,10 @@ const ConfiguracionRutas = () => {
         </div>
       </div>
 
-      {/* Routes Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      {/* =========================================================
+          TABLA DE RUTAS Y MODALES (COMENTADOS) 
+          ========================================================= */}
+      {/* <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-6 border-b border-gray-200 flex flex-wrap justify-between items-center gap-4">
           <h2 className="text-xl font-bold text-gray-800">Rutas Parametrizadas Actualmente</h2>
           <button
@@ -156,7 +163,6 @@ const ConfiguracionRutas = () => {
         </div>
       </div>
 
-      {/* Create Folder Modal */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 relative">
@@ -191,7 +197,6 @@ const ConfiguracionRutas = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && selectedRoute && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 text-center">
@@ -220,6 +225,7 @@ const ConfiguracionRutas = () => {
           </div>
         </div>
       )}
+      */}
     </div>
   );
 };

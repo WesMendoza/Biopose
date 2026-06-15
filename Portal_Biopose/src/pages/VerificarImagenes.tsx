@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, AlertCircle, Image as ImageIcon, ZoomIn, ZoomOut, Maximize, User, Info, Loader } from 'lucide-react';
+import { Search, AlertCircle, Image as ImageIcon, ZoomIn, ZoomOut, Maximize, User, Info, Loader, FolderOpen } from 'lucide-react';
 import { useVerificarImagenes } from '../hooks/useVerificarImagenes';
 
 // DICCIONARIOS DE CONEXIÓN
@@ -15,12 +15,12 @@ const POSE_CONNECTIONS = [
 
 const VerificarImagenes = () => {
   const {
-    selectedPath, setSelectedPath, selectedFile, setSelectedFile,
-    imageUrl, errorPath, setErrorPath, errorFile, setErrorFile,
-    paths, availableFiles, poseResults, isLoading, handleLoadImage
+    folderName, selectedFile, setSelectedFile,
+    imageUrl, errorFile, setErrorFile,
+    availableFiles, poseResults, isLoading, 
+    handleLoadImage, handleFolderSelect, folderInputRef
   } = useVerificarImagenes();
 
-  // Estados interactivos para el SVG y zoom
   const [selectedKp, setSelectedKp] = useState<number | null>(null);
   const [selectedPersonIndex, setSelectedPersonIndex] = useState<number>(0);
   const [naturalSize, setNaturalSize] = useState({ w: 0, h: 0 });
@@ -40,50 +40,29 @@ const VerificarImagenes = () => {
   };
   const handleMouseUp = () => setIsDragging(false);
 
-  // Filtro de persona actual
   const currentPerson = poseResults?.persons?.[selectedPersonIndex];
   const validKeypoints = currentPerson?.keypoints?.filter((kp: any) => {
     return !(kp.x === 0 && kp.y === 0) && (kp.confidence === undefined || kp.confidence >= 0.3);
   }) || [];
 
-  // ======================================================================
-  // MATEMÁTICA ALINEADA CON EL MODAL DE GENERACIÓN DE IMÁGENES
-  // ======================================================================
   const isVideo = poseResults?.model_used?.includes('Video');
-  
-  // Verificamos si los puntos vienen normalizados (0.0 a 1.0)
   const isNormalized = validKeypoints.length > 0 && validKeypoints.every((p: any) => p.x <= 1.5 && p.y <= 1.5);
 
   const getRealCoords = (kpX: number, kpY: number) => {
     if (naturalSize.w === 0 || naturalSize.h === 0) return { x: kpX, y: kpY };
 
     if (isVideo) {
-      // 1. Si los puntos están normalizados (0-1), multiplicamos por el ancho/alto real
       if (isNormalized) {
-        return { 
-          x: kpX * naturalSize.w, 
-          y: kpY * naturalSize.h 
-        };
+        return { x: kpX * naturalSize.w, y: kpY * naturalSize.h };
       }
-      
-      // 2. Si YOLO devuelve coordenadas absolutas (ej. en base 640x640)
-      // Escalar las coordenadas desde la resolución de procesamiento a la resolución original del fotograma.
-      // Asumimos que la resolución de procesamiento de YOLO fue 640x640 (o puedes ajustarlo).
       const YOLO_RESOLUTION = 640; 
-      
       const scaleX = naturalSize.w / YOLO_RESOLUTION;
       const scaleY = naturalSize.h / YOLO_RESOLUTION;
 
-      return {
-        x: kpX * scaleX,
-        y: kpY * scaleY
-      };
+      return { x: kpX * scaleX, y: kpY * scaleY };
     }
-
-    // Imágenes normales estáticas
     return { x: kpX, y: kpY }; 
   };
-  // ======================================================================
 
   return (
     <div className="p-8 max-w-[1400px] mx-auto font-sans h-[calc(100vh-4rem)] flex flex-col">
@@ -92,35 +71,47 @@ const VerificarImagenes = () => {
       {/* TOP BAR: Búsqueda */}
       <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100 mb-6 shrink-0">
         <h4 className="text-lg font-semibold text-gray-700 mb-4 flex items-center">
-          <Search className="w-5 h-5 mr-2 text-indigo-500" /> Cargar desde Dataset
+          <Search className="w-5 h-5 mr-2 text-indigo-500" /> Cargar desde tu computadora
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+          
+          {/* NUEVO BOTÓN DE CARPETA (Reemplaza al antiguo Select de Rutas) */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Ruta del Dataset</label>
-            <select 
-              className={`w-full px-3 py-2 border rounded-md focus:ring-indigo-500 text-sm ${errorPath ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
-              value={selectedPath} onChange={(e) => { setSelectedPath(e.target.value); setSelectedFile(''); setErrorPath(false); }}
+            <label className="block text-sm font-medium text-gray-700 mb-2">Carpeta del Dataset (ZIP extraído)</label>
+            <button 
+              onClick={() => folderInputRef.current?.click()}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 text-sm hover:bg-gray-50 flex items-center justify-between text-gray-600 transition-colors"
             >
-              <option value="">Elige una ruta parametrizada</option>
-              {paths.map((p, i) => <option key={i} value={p.id}>{p.name}</option>)}
-            </select>
-            {errorPath && <p className="text-xs text-red-500 mt-1 flex items-center"><AlertCircle className="w-3 h-3 mr-1" /> Requerido</p>}
+              <span className="truncate">{folderName ? folderName : 'Seleccionar Carpeta...'}</span>
+              <FolderOpen className="w-4 h-4 ml-2 text-indigo-500 shrink-0" />
+            </button>
+            <input 
+              type="file" 
+              // Estos atributos son vitales para permitir seleccionar carpetas enteras
+              // @ts-ignore
+              webkitdirectory="true" 
+              directory="true" 
+              multiple 
+              className="hidden" 
+              ref={folderInputRef}
+              onChange={handleFolderSelect}
+            />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Archivo a inspeccionar</label>
             <select 
               className={`w-full px-3 py-2 border rounded-md focus:ring-indigo-500 text-sm ${errorFile ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
-              value={selectedFile} onChange={(e) => { setSelectedFile(e.target.value); setErrorFile(false); }} disabled={!selectedPath}
+              value={selectedFile} onChange={(e) => { setSelectedFile(e.target.value); setErrorFile(false); }} disabled={availableFiles.length === 0}
             >
-              <option value="">Archivos disponibles...</option>
+              <option value="">{availableFiles.length > 0 ? 'Selecciona una imagen...' : 'Esperando archivos...'}</option>
               {availableFiles.map((f, i) => <option key={i} value={f.id}>{f.name}</option>)}
             </select>
             {errorFile && <p className="text-xs text-red-500 mt-1 flex items-center"><AlertCircle className="w-3 h-3 mr-1" /> Requerido</p>}
           </div>
 
           <button 
-            onClick={handleLoadImage} disabled={isLoading}
+            onClick={handleLoadImage} disabled={isLoading || !selectedFile}
             className="w-full flex justify-center items-center px-4 py-2 h-[38px] bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium transition-colors disabled:opacity-50"
           >
             {isLoading ? <Loader className="w-5 h-5 animate-spin mr-2" /> : <ImageIcon className="w-5 h-5 mr-2" />}
@@ -192,7 +183,7 @@ const VerificarImagenes = () => {
               <div className="p-8 h-full flex flex-col items-center justify-center text-center">
                 <AlertCircle className="w-16 h-16 text-orange-200 mb-4" />
                 <h3 className="text-xl font-bold text-gray-700">Sin Datos de Análisis</h3>
-                <p className="text-gray-500 mt-2">Esta imagen no tiene un archivo JSON de resultados asociado en su directorio local.</p>
+                <p className="text-gray-500 mt-2">Esta imagen no tiene un archivo JSON de resultados o el formato no coincide con el seleccionado.</p>
               </div>
             ) : (
               <>
@@ -242,8 +233,8 @@ const VerificarImagenes = () => {
       ) : (
         <div className="flex-grow bg-white rounded-lg shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center p-12">
           <div className="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center mb-4"><ImageIcon className="w-12 h-12 text-indigo-200" /></div>
-          <h3 className="text-xl font-medium text-gray-600 mb-2">Visor de Datasets</h3>
-          <p className="text-sm text-gray-400 max-w-md">Selecciona una ruta en el panel superior para cargar las imágenes y revisar cómo quedó la extracción de Keypoints.</p>
+          <h3 className="text-xl font-medium text-gray-600 mb-2">Visor de Datasets Offline</h3>
+          <p className="text-sm text-gray-400 max-w-md">Selecciona la carpeta local donde extrajiste el archivo ZIP descargado. El sistema leerá el JSON y mostrará las imágenes y los puntos sin usar internet.</p>
         </div>
       )}
     </div>

@@ -42,6 +42,22 @@ export const api = {
   put: (path: string, body: any) => apiFetch(path, { method: 'PUT', headers: buildHeaders(true), body: JSON.stringify(body) }),
   patch: (path: string, body: any) => apiFetch(path, { method: 'PATCH', headers: buildHeaders(true), body: JSON.stringify(body) }),
   del: (path: string) => apiFetch(path, { method: 'DELETE', headers: buildHeaders(true) }),
+  
+  // === NUEVO MÉTODO PARA DESCARGAS DE ARCHIVOS ===
+  postBlob: async (path: string, body: any) => {
+    const url = path.startsWith('http') ? path : `${API_BASE}${path}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: buildHeaders(true), // Mantiene tu token de seguridad
+      body: JSON.stringify(body)
+    });
+    
+    if (!res.ok) {
+        throw new Error(res.statusText || 'Error en la descarga');
+    }
+    // ¡La magia! Leemos la respuesta directamente como un archivo binario
+    return res.blob(); 
+  }
 };
 
-export default api;
+export default api;  

@@ -1,97 +1,148 @@
-import { useState, useEffect } from 'react';
-import api from '../lib/api';
-import { jwtDecode } from 'jwt-decode';
+import { useState, useRef } from 'react';
 
 export const useVerificarImagenes = () => {
-  const [selectedPath, setSelectedPath] = useState('');
+  // Estados para manejar la memoria local
+  const [localFiles, setLocalFiles] = useState<File[]>([]);
+  const [masterJson, setMasterJson] = useState<any>(null);
+  const [folderName, setFolderName] = useState<string>('');
+
   const [selectedFile, setSelectedFile] = useState('');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [errorPath, setErrorPath] = useState(false);
   const [errorFile, setErrorFile] = useState(false);
   
-  const [paths, setPaths] = useState<any[]>([]);
   const [availableFiles, setAvailableFiles] = useState<any[]>([]);
-  
-  // NUEVOS ESTADOS PARA LOS PUNTOS DE LA IMAGEN
   const [poseResults, setPoseResults] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // 1. Cargar las rutas de la BD de la empresa al iniciar
-  useEffect(() => {
-    const cargarRutas = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-      try {
-        const decoded: any = jwtDecode(token);
-        const idEmpresa = decoded.idEmpresa;
-        const response = await api.get(`/api/menuOpciones/rutas/configurar/?idEmpresa=${idEmpresa}`);
-        if (Array.isArray(response)) {
-          const soloSubRutas = response.filter((item: any) => item.codigo && item.codigo.startsWith('SUBRUTA_'));
-          setPaths(soloSubRutas.map(r => ({ id: r.valor, name: r.valor })));
-        }
-      } catch (error) {
-        console.error("Error al cargar rutas:", error);
-      }
-    };
-    cargarRutas();
-  }, []);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
-  // 2. Cuando cambie la ruta, pedir a Django los archivos .jpg de esa carpeta
-  useEffect(() => {
-    if (!selectedPath) {
-      setAvailableFiles([]);
-      setSelectedFile('');
+  // 1. Lee la carpeta seleccionada en Windows/Mac
+  const handleFolderSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    // Obtener el nombre de la carpeta principal
+    const pathParts = files[0].webkitRelativePath.split('/');
+    if (pathParts.length > 0) {
+      setFolderName(pathParts[0]);
+    }
+
+    setLocalFiles(files);
+    setImageUrl(null);
+    setPoseResults(null);
+    setSelectedFile('');
+
+    // 2. Buscar el archivo JSON en toda la carpeta
+    const jsonFile = files.find(f => f.name.endsWith('.json'));
+    if (jsonFile) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const parsed = JSON.parse(event.target?.result as string);
+          setMasterJson(parsed);
+        } catch (err) {
+          console.error("Error al leer JSON:", err);
+          alert("El archivo JSON está corrupto o es inválido.");
+        }
+      };
+      reader.readAsText(jsonFile);
+    } else {
+      setMasterJson(null);
+      alert("Advertencia: No se encontró ningún archivo .json en esta carpeta. Solo podrás ver las imágenes sin los puntos articulados.");
+    }
+
+    // 3. Filtrar y ordenar las imágenes (.jpg, .png, .jpeg)
+    const imageFiles = files.filter(f => f.name.match(/\.(jpg|jpeg|png)$/i));
+    const sortedImages = imageFiles.sort((a, b) => a.name.localeCompare(b.name));
+    
+    setAvailableFiles(sortedImages.map(f => ({ id: f.name, name: f.name })));
+  };
+
+  // 4. Cargar la imagen y buscar sus puntos en la memoria
+  const handleLoadImage = () => {
+    if (!selectedFile) {
+      setErrorFile(true);
       return;
     }
-    const fetchFiles = async () => {
-      try {
-        const response = await api.post('/api/analysis/pose/local-files/', { target_path: selectedPath });
-        setAvailableFiles(response || []);
-      } catch (error) {
-        console.error("Error al listar archivos locales", error);
-        setAvailableFiles([]);
-      }
-    };
-    fetchFiles();
-  }, [selectedPath]);
-
-  // 3. Al hacer clic en "Cargar", traer la imagen y el JSON
-  const handleLoadImage = async () => {
-    let hasError = false;
-    if (!selectedPath) { setErrorPath(true); hasError = true; } else { setErrorPath(false); }
-    if (!selectedFile) { setErrorFile(true); hasError = true; } else { setErrorFile(false); }
-    if (hasError) return;
-
+    setErrorFile(false);
     setIsLoading(true);
-    setPoseResults(null);
-    setImageUrl(null);
 
-    try {
-      const response = await api.post('/api/analysis/pose/local-file-data/', {
-        target_path: selectedPath,
-        file_name: selectedFile
-      });
-      
-      setImageUrl(response.image_b64);
-      setPoseResults(response.json_data);
-    } catch (error) {
-      console.error("Error al cargar datos del archivo", error);
-      alert("Hubo un error al leer la imagen o su JSON correspondiente.");
-    } finally {
+    // Buscar el archivo físico en la memoria
+    const fileObj = localFiles.find(f => f.name === selectedFile);
+    if (!fileObj) {
       setIsLoading(false);
+      return;
     }
+
+    // Crear una URL temporal en el navegador para mostrar la foto instantáneamente
+    const url = URL.createObjectURL(fileObj);
+    setImageUrl(url);
+
+    // LÓGICA INTELIGENTE (Migrada de Django a JS)
+    if (masterJson) {
+      // CASO A: Es un fotograma de video (Ej: 00001_frame_001.jpg)
+      if (selectedFile.includes('_frame_')) {
+        const match = selectedFile.match(/_frame_(\d+)/);
+        if (match) {
+          const frameIdx = parseInt(match[1], 10) - 1; // Índice base 0
+          
+          let framesList = [];
+          if (Array.isArray(masterJson)) {
+            framesList = masterJson;
+          } else {
+            framesList = masterJson.keypoints_data || masterJson.keypoints || masterJson.frames || masterJson.data || [];
+          }
+
+          if (framesList[frameIdx]) {
+            let frameInfo = framesList[frameIdx];
+            let rawPts = typeof frameInfo === 'string' ? JSON.parse(frameInfo) : frameInfo;
+            
+            let ptsArray = rawPts.keypoints_json || rawPts.keypoints || rawPts;
+            if (typeof ptsArray === 'string') {
+              try { ptsArray = JSON.parse(ptsArray); } catch(e) { ptsArray = []; }
+            }
+
+            let personsList: any[] = [];
+            if (Array.isArray(ptsArray)) {
+              // Si es un arreglo de arreglos (multipersona)
+              if (ptsArray.length > 0 && Array.isArray(ptsArray[0])) {
+                ptsArray.forEach((p, i) => personsList.push({ person_id: i, keypoints: p }));
+              } else {
+                // Una sola persona
+                personsList.push({ person_id: 0, keypoints: ptsArray });
+              }
+            }
+
+            setPoseResults({
+              model_used: masterJson.model_used || "YOLOv8-pose (Video)",
+              persons_detected: personsList.length,
+              persons: personsList
+            });
+          } else {
+            setPoseResults(null);
+          }
+        }
+      } else {
+        // CASO B: Es una imagen estática (El JSON pertenece solo a esta foto)
+        setPoseResults(masterJson);
+      }
+    } else {
+      setPoseResults(null);
+    }
+
+    setIsLoading(false);
   };
 
   return {
-    selectedPath, setSelectedPath,
+    folderName,
     selectedFile, setSelectedFile,
     imageUrl, setImageUrl,
-    errorPath, setErrorPath,
     errorFile, setErrorFile,
-    paths,
     availableFiles,
     poseResults,
     isLoading,
-    handleLoadImage
+    handleLoadImage,
+    handleFolderSelect,
+    folderInputRef
   };
 };

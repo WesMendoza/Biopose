@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { CheckCircle, CloudUpload, Image as ImageIcon, Loader, Settings, X, ZoomIn, ZoomOut, Maximize, AlertCircle, User, Info } from 'lucide-react';
+import { CheckCircle, CloudUpload, Image as ImageIcon, Loader, Settings, X, ZoomIn, ZoomOut, Maximize, AlertCircle, User, Info, Download } from 'lucide-react';
 import { useCargaImagen } from '../hooks/useCargaImagen';
 
 const KEYPOINT_NAMES: Record<number, string> = {
@@ -23,7 +23,8 @@ const CargaImagen = () => {
     isPoseModalOpen, setIsPoseModalOpen,
     poseResults, setPoseResults, fileInputRef,
     handleFileChange, handleProcessClick, handleGeneratePose,
-    selectedPath, setSelectedPath, paths, handleSaveResults
+    // selectedPath, setSelectedPath, paths, // === COMENTADO ===
+    handleSaveResults
   } = useCargaImagen();
 
   const [selectedKp, setSelectedKp] = useState<number | null>(null);
@@ -35,7 +36,6 @@ const CargaImagen = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-  // NUEVO: Referencia al SVG y estado del punto arrastrado
   const svgRef = useRef<SVGSVGElement>(null);
   const [draggedKp, setDraggedKp] = useState<number | null>(null);
 
@@ -52,7 +52,6 @@ const CargaImagen = () => {
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    // 1. Si estamos arrastrando un Keypoint, actualizamos el JSON
     if (draggedKp !== null && svgRef.current) {
       e.stopPropagation();
       const svg = svgRef.current as any;
@@ -75,14 +74,13 @@ const CargaImagen = () => {
       return;
     }
 
-    // 2. Si no, arrastramos el panel (Pan)
     if (!isDragging) return;
     setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
   };
 
   const handleMouseUp = () => {
     setIsDragging(false);
-    setDraggedKp(null); // Soltar el punto
+    setDraggedKp(null); 
   };
 
   const currentPerson = poseResults?.persons?.[selectedPersonIndex];
@@ -102,13 +100,16 @@ const CargaImagen = () => {
           </h4>
           <hr className="mb-4 border-gray-200" />
           <div className="space-y-6">
-            <div>
+            
+            {/* === COMBOBOX DE RUTAS COMENTADO === */}
+            {/* <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Elije la ruta de guardado:</label>
               <select value={selectedPath} onChange={(e) => setSelectedPath(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
                 <option value="">Selecciona una carpeta...</option>
                 {paths.length > 0 ? (paths.map((route: any) => (<option key={route.codigo} value={route.valor}>{route.valor}</option>))) : (<option disabled>No hay rutas disponibles</option>)}
               </select>
-            </div>
+            </div> */}
+
             <div className="bg-indigo-50 p-4 rounded-md border border-indigo-100">
               <p className="text-sm text-indigo-800 mb-3">Tu imagen será redimensionada a: <strong>{width} X {height}</strong></p>
               <select onChange={(e) => { const [w, h] = e.target.value.split('x').map(Number); setWidth(w); setHeight(h); }} className="w-full px-3 py-2 text-sm border border-indigo-200 rounded-md focus:ring-indigo-500" value={`${width}x${height}`}>
@@ -211,11 +212,11 @@ const CargaImagen = () => {
                         <circle 
                           key={`joint-${kp.id}`} 
                           cx={kp.x} cy={kp.y} 
-                          r={Math.max(naturalSize.w / 180, 8)} // Más grande para atrapar el click más fácil
+                          r={Math.max(naturalSize.w / 180, 8)} 
                           fill={selectedKp === kp.id ? "#ef4444" : "#3b82f6"} 
                           stroke="#ffffff" strokeWidth={Math.max(naturalSize.w / 600, 1.5)} 
                           className="cursor-pointer hover:fill-yellow-400 transition-colors"
-                          onMouseDown={(e) => { e.stopPropagation(); setDraggedKp(kp.id); setSelectedKp(kp.id); }} // CAPTURA EL CLICK
+                          onMouseDown={(e) => { e.stopPropagation(); setDraggedKp(kp.id); setSelectedKp(kp.id); }} 
                         />
                       ))}
                     </svg>
@@ -266,7 +267,9 @@ const CargaImagen = () => {
 
                   <div className="flex flex-col sm:flex-row gap-3 mt-6 pt-5 border-t border-slate-200 shrink-0">
                     <button className="flex-1 py-3 border border-red-200 text-red-600 bg-white hover:bg-red-50 rounded-xl font-bold transition-colors text-sm shadow-sm" onClick={handleCloseModal}>Descartar Análisis</button>
-                    <button className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-md shadow-indigo-200 hover:shadow-lg text-sm" onClick={handleSaveResults}>Guardar Resultados</button>
+                    <button className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-md shadow-indigo-200 hover:shadow-lg text-sm flex justify-center items-center" onClick={handleSaveResults}>
+                      <Download className="w-4 h-4 mr-2" /> Guardar Resultados
+                    </button>
                   </div>
                 </div>
               </div>
