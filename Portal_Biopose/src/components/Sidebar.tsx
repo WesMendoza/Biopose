@@ -3,9 +3,10 @@ import {
   Home, Users, ChevronDown, ChevronRight,
   FolderOpen, Image as ImageIcon, Film,
   UserCheck, Video, LogOut, Menu, X,
-  Building2, Shield // <-- Nuevos íconos importados
+  Building2, Shield
 } from 'lucide-react';
 import { useSidebar } from '../hooks/useSidebar';
+import { jwtDecode } from 'jwt-decode'; // <-- IMPORTAMOS EL DECODIFICADOR
 
 const Sidebar = () => {
   const {
@@ -18,9 +19,36 @@ const Sidebar = () => {
     subNavLinkClass
   } = useSidebar();
 
+  // 1. OBTENEMOS EL ROL DEL USUARIO
+  let esAdministrador = false;
+  try {
+    const token = localStorage.getItem('token');
+    if (token) {
+      const decoded: any = jwtDecode(token);
+      
+      // 💡 Imprimimos el token en consola para que veas qué datos exactos te envía Django
+      console.log("Datos dentro del Token:", decoded);
+
+      // Buscamos el rol en texto (por si acaso)
+      const rolTexto = String(decoded.nombreRol || decoded.rol || decoded.role || '').toLowerCase();
+      
+      // Buscamos el ID del rol (que es lo que realmente envía tu BD)
+      const idRol = Number(decoded.idRol);
+
+      // ERES ADMINISTRADOR SI: 
+      // 1. El texto dice 'admin' OR 
+      // 2. Tienes el idRol 1 (Admin Emp 1) OR 
+      // 3. Tienes el idRol 5 (Admin Emp 2)
+      if (rolTexto.includes('admin') || idRol === 1 || idRol === 5) {
+        esAdministrador = true;
+      }
+    }
+  } catch (error) {
+    console.error("Error al decodificar token en Sidebar:", error);
+  }
+
   return (
     <>
-      {/* Botón flotante para reabrir cuando está cerrado */}
       {!isSidebarOpen && (
         <button 
           onClick={toggleSidebar}
@@ -31,7 +59,6 @@ const Sidebar = () => {
         </button>
       )}
 
-      {/* Menú Sidebar */}
       <nav className={`bg-gray-900 text-white flex flex-col h-screen shadow-lg transition-all duration-300 z-40 ${isSidebarOpen ? 'w-72' : 'w-20'}`}>
         <div className={`flex items-center h-20 border-b border-gray-800 px-4 ${isSidebarOpen ? 'justify-between' : 'justify-center'}`}>
           {isSidebarOpen && <h1 className="text-2xl font-bold tracking-wider text-blue-400">BioPose</h1>}
@@ -45,31 +72,45 @@ const Sidebar = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 py-4 space-y-2 overflow-x-hidden">
-          {/* CORREGIDO: Añadido /app */}
           <NavLink to="/app/dashboard" className={navLinkClass} title="Home">
             <Home className="w-5 h-5 flex-shrink-0" />
             {isSidebarOpen && <span>Home</span>}
           </NavLink>
 
-          {/* Sección de Administración */}
-          {/* CORREGIDO: Añadido /app */}
-          <NavLink to="/app/users" className={navLinkClass} title="Gestión de Usuarios">
-            <Users className="w-5 h-5 flex-shrink-0" />
-            {isSidebarOpen && <span>Gestión de Usuarios</span>}
-          </NavLink>
+          {/* ========================================== */}
+          {/* SECCIÓN RESTRINGIDA SOLO PARA ADMINISTRADOR  */}
+          {/* ========================================== */}
+          {esAdministrador && (
+            <>
+              {isSidebarOpen && (
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider pl-4 mb-2 mt-4">
+                  Administración
+                </div>
+              )}
+              
+              <NavLink to="/app/users" className={navLinkClass} title="Gestión de Usuarios">
+                <Users className="w-5 h-5 flex-shrink-0" />
+                {isSidebarOpen && <span>Gestión de Usuarios</span>}
+              </NavLink>
 
-          {/* CORREGIDO: Añadido /app */}
-          <NavLink to="/app/gestion-empresas" className={navLinkClass} title="Gestión de Empresas">
-            <Building2 className="w-5 h-5 flex-shrink-0" />
-            {isSidebarOpen && <span>Gestión de Empresas</span>}
-          </NavLink>
+              <NavLink to="/app/gestion-empresas" className={navLinkClass} title="Gestión de Empresas">
+                <Building2 className="w-5 h-5 flex-shrink-0" />
+                {isSidebarOpen && <span>Gestión de Empresas</span>}
+              </NavLink>
 
-          {/* CORREGIDO: Añadido /app */}
-          <NavLink to="/app/gestion-roles" className={navLinkClass} title="Gestión de Roles">
-            <Shield className="w-5 h-5 flex-shrink-0" />
-            {isSidebarOpen && <span>Gestión de Roles</span>}
-          </NavLink>
+              <NavLink to="/app/gestion-roles" className={navLinkClass} title="Gestión de Roles">
+                <Shield className="w-5 h-5 flex-shrink-0" />
+                {isSidebarOpen && <span>Gestión de Roles</span>}
+              </NavLink>
+            </>
+          )}
+          {/* ========================================== */}
           
+          {isSidebarOpen && (
+            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider pl-4 mb-2 mt-4">
+              Módulos IA
+            </div>
+          )}
 
           {/* Pose Estimation Section */}
           <div>
@@ -87,7 +128,6 @@ const Sidebar = () => {
             
             {openSection === 'pose' && (
               <div className="mt-1 space-y-1">
-                {/* CORREGIDOS: Añadido /app */}
                 <NavLink to="/app/pose/routes" className={subNavLinkClass} title="Configuración de rutas">
                   <FolderOpen className="w-4 h-4 flex-shrink-0" />
                   {isSidebarOpen && <span>Configuración de rutas</span>}
@@ -129,7 +169,6 @@ const Sidebar = () => {
                     Individual
                   </div>
                 )}
-                {/* CORREGIDOS: Añadido /app */}
                 <NavLink to="/app/events/individual/video" className={subNavLinkClass} title="Detección en video (Individual)">
                   <Film className="w-4 h-4 flex-shrink-0" />
                   {isSidebarOpen && <span>Detección en video</span>}
@@ -144,7 +183,6 @@ const Sidebar = () => {
                     Multipersonas
                   </div>
                 )}
-                {/* CORREGIDOS: Añadido /app */}
                 <NavLink to="/app/events/multi/video" className={subNavLinkClass} title="Detección en video (Multipersona)">
                   <Film className="w-4 h-4 flex-shrink-0" />
                   {isSidebarOpen && <span>Detección en video</span>}

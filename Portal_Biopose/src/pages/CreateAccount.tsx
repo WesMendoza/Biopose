@@ -1,11 +1,14 @@
-import { UserPlus, User, Mail, Lock, Building, CheckCircle } from 'lucide-react';
+import { UserPlus, User, Mail, Lock, Building, CheckCircle, Briefcase, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useCreateAccount } from '../hooks/useCreateAccount';
 
 const CreateAccount = () => {
   const {
     formData,
+    empresas,
     isSuccess,
+    isCrearEmpresa,
+    setIsCrearEmpresa,
     handleChange,
     handleSubmit
   } = useCreateAccount();
@@ -13,10 +16,8 @@ const CreateAccount = () => {
   return (
     <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 sm:p-8 font-sans relative overflow-hidden">
       
-      {/* Brillo celeste de fondo */}
       <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[50%] bg-[#0ea5e9] opacity-[0.08] rounded-full blur-[120px] pointer-events-none"></div>
 
-      {/* 1. SE ELIMINÓ min-h-[650px] PARA QUE SE ADAPTE AL CONTENIDO */}
       <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-6xl flex overflow-hidden relative z-10">
         
         {/* Panel Izquierdo */}
@@ -40,12 +41,12 @@ const CreateAccount = () => {
             </div>
             <div className="flex items-center text-xs font-medium text-blue-100/90">
               <CheckCircle className="w-4 h-4 mr-2 text-sky-300 flex-shrink-0" />
-              <span>Análisis de Comportamiento</span>
+              <span>SaaS Auto-administrable</span>
             </div>
           </div>
         </div>
 
-        {/* 2. SE REDUJO EL PADDING DEL CONTENEDOR DERECHO (p-8 md:p-10) */}
+        {/* Panel Derecho */}
         <div className="w-full md:w-2/3 p-8 md:p-10 relative flex flex-col justify-center">
           
           <h2 className="text-[26px] font-extrabold text-gray-900 mb-6 text-center md:text-left tracking-tight">
@@ -63,21 +64,19 @@ const CreateAccount = () => {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               
-              {/* 3. SE REDUJO EL GAP A gap-4 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
+                {/* Inputs de texto estándar */}
                 {[
                   { label: "Identificación", name: "identificacion", icon: User, type: "text", placeholder: "Ej: 0102030405" },
                   { label: "Nombres Completos", name: "nombres", icon: User, type: "text", placeholder: "Ej: Juan" },
                   { label: "Apellidos Completos", name: "apellidos", icon: User, type: "text", placeholder: "Ej: Pérez" },
                   { label: "Correo Electrónico", name: "correo", icon: Mail, type: "email", placeholder: "juan@ejemplo.com" },
-                  { label: "Empresa", name: "empresa", icon: Building, type: "text", placeholder: "Empresa EJ." },
                 ].map((field, idx) => (
                   <div key={idx}>
                     <label className="block text-[11px] font-bold text-gray-500 mb-1.5 uppercase tracking-wide">{field.label}</label>
                     <div className="relative">
                       <field.icon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      {/* 4. SE REDUJO EL PADDING DE LOS INPUTS (py-2.5) */}
                       <input
                         type={field.type}
                         name={field.name}
@@ -90,7 +89,92 @@ const CreateAccount = () => {
                     </div>
                   </div>
                 ))}
+              </div>
 
+              {/* TOGGLE PARA ELEGIR MODO DE EMPRESA */}
+              <div className="pt-2">
+                <label className="block text-[11px] font-bold text-gray-500 mb-2 uppercase tracking-wide">Espacio de Trabajo</label>
+                <div className="flex p-1 bg-slate-100 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setIsCrearEmpresa(false)}
+                    className={`flex-1 py-2 text-[12px] font-bold rounded-lg transition-all ${!isCrearEmpresa ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:bg-slate-200'}`}
+                  >
+                    Unirme a una Empresa
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsCrearEmpresa(true)}
+                    className={`flex-1 py-2 text-[12px] font-bold rounded-lg transition-all ${isCrearEmpresa ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:bg-slate-200'}`}
+                  >
+                    Registrar Mi Empresa
+                  </button>
+                </div>
+              </div>
+
+              {/* RENDERIZADO CONDICIONAL DE EMPRESA */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                {!isCrearEmpresa ? (
+                  <div className="md:col-span-2">
+                    <label className="block text-[11px] font-bold text-gray-500 mb-1.5 uppercase tracking-wide">Seleccione Empresa</label>
+                    <div className="relative">
+                      <Building className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+                      <select
+                        name="codigoEmpresa"
+                        value={formData.codigoEmpresa}
+                        onChange={handleChange}
+                        required={!isCrearEmpresa}
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-transparent bg-white text-gray-800 focus:outline-none focus:border-[#0ea5e9] focus:ring-2 focus:ring-[#0ea5e9]/20 transition-all text-[13px] appearance-none"
+                      >
+                        <option value="" disabled>Seleccione una empresa de la lista...</option>
+                        {empresas.map((emp) => (
+                          <option key={emp.codigoEmpresa} value={emp.codigoEmpresa}>
+                            {emp.nombreEmpresa}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-500 mb-1.5 uppercase tracking-wide">Nombre de la Empresa</label>
+                      <div className="relative">
+                        <Briefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <input
+                          type="text"
+                          name="nombreEmpresa"
+                          value={formData.nombreEmpresa}
+                          onChange={handleChange}
+                          required={isCrearEmpresa}
+                          placeholder="Ej: TechCorp S.A."
+                          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-transparent bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#0ea5e9] focus:ring-2 focus:ring-[#0ea5e9]/20 transition-all text-[13px]"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-500 mb-1.5 uppercase tracking-wide">RUC de la Empresa</label>
+                      <div className="relative">
+                        <FileText className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <input
+                          type="text"
+                          name="rucEmpresa"
+                          value={formData.rucEmpresa}
+                          onChange={handleChange}
+                          required={isCrearEmpresa}
+                          placeholder="Ej: 0991234567001"
+                          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-transparent bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#0ea5e9] focus:ring-2 focus:ring-[#0ea5e9]/20 transition-all text-[13px]"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[11px] font-bold text-gray-500 mb-1.5 uppercase tracking-wide">Celular</label>
                   <div className="relative">
@@ -107,7 +191,7 @@ const CreateAccount = () => {
                   </div>
                 </div>
 
-                <div className="md:col-span-2">
+                <div>
                   <label className="block text-[11px] font-bold text-gray-500 mb-1.5 uppercase tracking-wide">Contraseña</label>
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -124,7 +208,6 @@ const CreateAccount = () => {
                 </div>
               </div>
 
-              {/* 5. SE REDUJO EL MARGEN DEL BOTÓN (mt-6) */}
               <div className="mt-6">
                 <button
                   type="submit"

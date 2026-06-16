@@ -8,7 +8,7 @@ import Openpose from '../assets/Openpose.png';
 import yolo from '../assets/yolo.png';
 
 const Dashboard = () => {
-  const { showTutorialModal, userName, saveFirstTutorial } = useDashboard();
+  const { userName } = useDashboard();
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans pb-20">
@@ -40,7 +40,7 @@ const Dashboard = () => {
       <section className="bg-slate-900 py-20 px-6 mt-8 rounded-[3rem] mx-4 md:mx-10 shadow-2xl">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-center font-bold text-sky-400 mb-16 text-4xl tracking-wide">
-            Lo que puedes lograr
+            Lo que puedes lograr, {userName}
           </h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -116,68 +116,6 @@ const Dashboard = () => {
           </div>
         </div>
       </section>
-
-      {/* --- MODAL TUTORIAL (Estilo Modernizado) --- */}
-      {showTutorialModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl flex flex-col md:flex-row overflow-hidden animate-fade-in-up">
-            
-            {/* Lado izquierdo GIF */}
-            <div className="w-full md:w-2/5 bg-indigo-50 flex items-center justify-center p-8">
-               {/* Si tu ruta de GIF es diferente, asegúrate de ajustarla aquí */}
-              <img src="/assets/say_hi_tutorial.gif" alt="Tutorial" className="w-full max-w-[200px] object-contain rounded-xl mix-blend-multiply" />
-            </div>
-
-            {/* Lado derecho Formulario */}
-            <div className="w-full md:w-3/5 p-8 md:p-12 flex flex-col justify-center">
-              <h1 className="text-3xl font-bold text-slate-800 mb-2">
-                Bienvenido, <span id="userTutorial" className="text-blue-600">{userName}</span>
-              </h1>
-              <h3 className="text-slate-500 mb-8 font-medium">Antes de continuar, completemos esto:</h3>
-              
-              <div className="space-y-6">
-                
-                {/* Input Ruta */}
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">¿Dónde guardaremos tus imágenes?</label>
-                  <p className="text-xs text-slate-500 mb-2">Crea una carpeta en tu equipo y pega la ruta aquí.</p>
-                  <input 
-                    type="text" 
-                    id="txtPath" 
-                    placeholder="Ej: C:\Users\Documentos\BioPose" 
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-700"
-                  />
-                </div>
-
-                {/* Input FPS */}
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">¿Cada cuántos frames desea obtener una imagen?</label>
-                  <p className="text-xs text-slate-500 mb-2">Puedes elegir entre 1 y 24 FPS (Frames Por Segundo).</p>
-                  <input 
-                    type="number" 
-                    id="txtFPS" 
-                    min="1" 
-                    max="24"
-                    placeholder="Ej: 5" 
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-700"
-                  />
-                </div>
-
-                {/* Botón */}
-                <button 
-                  type="button" 
-                  onClick={saveFirstTutorial}
-                  className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-500/20 transition-all mt-4"
-                >
-                  Continuar al Dashboard
-                </button>
-
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import api from '../lib/api';
+import { jwtDecode } from 'jwt-decode'; // <-- IMPORTAMOS EL DECODIFICADOR
 
 export interface Empresa {
   idEmpresa?: number;
@@ -21,17 +22,34 @@ export const useEmpresas = () => {
   const [selectedEmpresa, setSelectedEmpresa] = useState<Empresa | null>(null);
   const [nuevaEmpresa, setNuevaEmpresa] = useState<Empresa>({ nombreEmpresa: '', ruc: '', direccion: '' });
 
+  // 1. EXTRAER LA EMPRESA DEL USUARIO LOGGEADO
+  const getEmpresaId = () => {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    try {
+      const decoded: any = jwtDecode(token);
+      return decoded.idEmpresa;
+    } catch {
+      return null;
+    }
+  };
+  const idEmpresa = getEmpresaId();
+
+  // 2. CARGAR EMPRESA FILTRADA
   const fetchEmpresas = useCallback(async () => {
+    if (!idEmpresa) return; // Si no hay token, no cargamos nada
+    
     setLoading(true);
     try {
-      const res = await api.get('/api/gestionEmpresas/empresas/');
+      // Le avisamos a Django qué empresa queremos ver
+      const res = await api.get(`/api/gestionEmpresas/empresas/?idEmpresa=${idEmpresa}`);
       setEmpresas(res?.detalle || res || []);
     } catch (error) {
       console.error("Error cargando empresas", error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [idEmpresa]);
 
   useEffect(() => {
     fetchEmpresas();

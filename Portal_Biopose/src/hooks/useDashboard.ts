@@ -1,16 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 
 export const useDashboard = () => {
-  const [showTutorialModal, setShowTutorialModal] = useState(true);
-  const userName = 'Usuario'; // Could be derived from auth state later
+  const userName = 'Usuario'; // Opcional: podrías extraerlo de tu JWT como en otras pantallas
 
   useEffect(() => {
-    const isConfigured = localStorage.getItem('tutorialCompleted');
-    if (isConfigured) {
-      setShowTutorialModal(false);
-    }
-
-    // Animación automática de scroll
+    // Animación automática de scroll (por si agregas la clase .reveal a algún elemento)
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -28,14 +22,7 @@ export const useDashboard = () => {
     return () => observer.disconnect();
   }, []);
 
-  const saveFirstTutorial = () => {
-    setShowTutorialModal(false);
-    localStorage.setItem('tutorialCompleted', 'true');
-  };
-
   return {
-    showTutorialModal,
-    userName,
-    saveFirstTutorial
+    userName
   };
 };
