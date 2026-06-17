@@ -25,10 +25,6 @@ const Sidebar = () => {
     const token = localStorage.getItem('token');
     if (token) {
       const decoded: any = jwtDecode(token);
-      
-      // 💡 Imprimimos el token en consola para que veas qué datos exactos te envía Django
-      console.log("Datos dentro del Token:", decoded);
-
       // Buscamos el rol en texto (por si acaso)
       const rolTexto = String(decoded.nombreRol || decoded.rol || decoded.role || '').toLowerCase();
       
