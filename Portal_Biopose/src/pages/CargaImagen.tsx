@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { CheckCircle, CloudUpload, Image as ImageIcon, Loader, Settings, X, ZoomIn, ZoomOut, Maximize, AlertCircle, User, Info, Download } from 'lucide-react';
+import { CheckCircle, CloudUpload, Image as ImageIcon, Loader, Settings, X, ZoomIn, ZoomOut, Maximize, AlertCircle, User, Info, Download, Trash2, PlusCircle } from 'lucide-react';
 import { useCargaImagen } from '../hooks/useCargaImagen';
 
 const KEYPOINT_NAMES: Record<number, string> = {
@@ -21,31 +21,28 @@ const CargaImagen = () => {
     file, imageUrl, width, setWidth, height, setHeight,
     isProcessing, isPreviewModalOpen, setIsPreviewModalOpen,
     isPoseModalOpen, setIsPoseModalOpen,
-    poseResults, setPoseResults, fileInputRef,
+    poseResults, setPoseResults, fileInputRef, batchResults,
     handleFileChange, handleProcessClick, handleGeneratePose,
-    // selectedPath, setSelectedPath, paths, // === COMENTADO ===
-    handleSaveResults
+    handleAddToBatch, handleDownloadBatch, handleRemoveFromBatch
   } = useCargaImagen();
 
   const [selectedKp, setSelectedKp] = useState<number | null>(null);
   const [selectedPersonIndex, setSelectedPersonIndex] = useState<number>(0);
   const [naturalSize, setNaturalSize] = useState({ w: 0, h: 0 });
-
   const [zoom, setZoom] = useState<number>(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-
   const svgRef = useRef<SVGSVGElement>(null);
   const [draggedKp, setDraggedKp] = useState<number | null>(null);
-
+  
   const handleCloseModal = () => {
     setIsPoseModalOpen(false); setSelectedKp(null); setSelectedPersonIndex(0);
     setZoom(1); setPan({ x: 0, y: 0 }); setDraggedKp(null);
   };
 
   const handleResetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
-
+  
   const handleMouseDown = (e: React.MouseEvent) => {
     if (zoom <= 1) return;
     setIsDragging(true); setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
@@ -60,7 +57,6 @@ const CargaImagen = () => {
       const pt = svg.createSVGPoint();
       pt.x = e.clientX; pt.y = e.clientY;
       const svgP = pt.matrixTransform(CTM.inverse());
-
       setPoseResults((prev: any) => {
         const newRes = { ...prev };
         const person = newRes.persons[selectedPersonIndex];
@@ -73,14 +69,13 @@ const CargaImagen = () => {
       });
       return;
     }
-
     if (!isDragging) return;
     setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
   };
 
   const handleMouseUp = () => {
     setIsDragging(false);
-    setDraggedKp(null); 
+    setDraggedKp(null);
   };
 
   const currentPerson = poseResults?.persons?.[selectedPersonIndex];
@@ -92,7 +87,6 @@ const CargaImagen = () => {
     <div className="p-8 max-w-7xl mx-auto font-sans">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Carga de Imagen</h1>
 
-      {/* --- PANEL DE CONFIGURACIÓN --- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100 flex flex-col">
           <h4 className="text-lg font-semibold text-gray-700 flex items-center mb-4">
@@ -100,16 +94,6 @@ const CargaImagen = () => {
           </h4>
           <hr className="mb-4 border-gray-200" />
           <div className="space-y-6">
-            
-            {/* === COMBOBOX DE RUTAS COMENTADO === */}
-            {/* <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Elije la ruta de guardado:</label>
-              <select value={selectedPath} onChange={(e) => setSelectedPath(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                <option value="">Selecciona una carpeta...</option>
-                {paths.length > 0 ? (paths.map((route: any) => (<option key={route.codigo} value={route.valor}>{route.valor}</option>))) : (<option disabled>No hay rutas disponibles</option>)}
-              </select>
-            </div> */}
-
             <div className="bg-indigo-50 p-4 rounded-md border border-indigo-100">
               <p className="text-sm text-indigo-800 mb-3">Tu imagen será redimensionada a: <strong>{width} X {height}</strong></p>
               <select onChange={(e) => { const [w, h] = e.target.value.split('x').map(Number); setWidth(w); setHeight(h); }} className="w-full px-3 py-2 text-sm border border-indigo-200 rounded-md focus:ring-indigo-500" value={`${width}x${height}`}>
@@ -146,6 +130,41 @@ const CargaImagen = () => {
               </button>
             )}
           </div>
+
+          {/* ZONA DEL CARRITO / LOTE */}
+          {batchResults.length > 0 && (
+            <div className="mt-8 border-t border-gray-200 pt-6">
+              <h4 className="text-md font-bold text-gray-800 mb-3 flex items-center justify-between">
+                Lote de Procesamiento 
+                <span className="bg-indigo-100 text-indigo-800 text-xs py-1 px-2 rounded-full font-bold">{batchResults.length} ítems</span>
+              </h4>
+              
+              <div className="space-y-2 mb-4 max-h-48 overflow-y-auto custom-scrollbar pr-2">
+                {batchResults.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between bg-slate-50 border border-slate-200 p-2 rounded-lg">
+                    <div className="flex items-center">
+                      <img src={item.previewUrl} className="w-10 h-10 object-cover rounded bg-white border border-gray-200 mr-3" />
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-gray-700">{(index + 1).toString().padStart(4, '0')}</span>
+                        <span className="text-[10px] text-gray-500 truncate w-32" title={item.originalName}>{item.originalName}</span>
+                      </div>
+                    </div>
+                    <button onClick={() => handleRemoveFromBatch(index)} className="text-red-400 hover:text-red-600 p-1 bg-red-50 hover:bg-red-100 rounded transition-colors" title="Eliminar del lote">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <button 
+                onClick={handleDownloadBatch} 
+                className="w-full flex justify-center items-center px-4 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-bold shadow-md transition-all"
+              >
+                <Download className="w-5 h-5 mr-2" /> 
+                Descargar Dataset ZIP ({batchResults.length})
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -172,9 +191,8 @@ const CargaImagen = () => {
               <h5 className="text-xl font-bold text-slate-800 flex items-center">Análisis Biométrico <span className="ml-4 text-xs font-normal bg-blue-100 text-blue-700 px-2 py-1 rounded">Puedes arrastrar los puntos para corregirlos</span></h5>
               <button onClick={handleCloseModal} className="text-slate-400 hover:text-slate-700 transition-colors bg-white border border-slate-200 p-1.5 rounded-lg shadow-sm"><X className="w-5 h-5" /></button>
             </div>
-            
             <div className="flex-grow flex flex-col lg:flex-row overflow-hidden">
-              <div 
+              <div
                 className="lg:w-3/5 relative bg-[#0f172a] overflow-hidden flex items-center justify-center border-r border-gray-200"
                 onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
               >
@@ -185,16 +203,16 @@ const CargaImagen = () => {
                   <button onClick={handleResetView} className="p-2.5 hover:bg-slate-100 text-indigo-600 transition-colors border-l border-slate-200/50"><Maximize className="w-5 h-5" /></button>
                 </div>
 
-                <div 
+                <div
                   className="relative origin-center inline-block"
-                  style={{ 
+                  style={{
                     transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                     cursor: draggedKp ? 'grabbing' : (zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'),
                     transitionProperty: 'transform', transitionDuration: isDragging || draggedKp ? '0ms' : '200ms', transitionTimingFunction: 'ease-out'
                   }}
                 >
-                  <img 
-                    src={imageUrl || ''} alt="Original Limpia" 
+                  <img
+                    src={imageUrl || ''} alt="Original Limpia"
                     className="block max-w-none shadow-2xl rounded-sm pointer-events-none select-none"
                     style={{ maxHeight: '85vh' }}
                     onLoad={(e) => setNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })} draggable="false"
@@ -208,22 +226,23 @@ const CargaImagen = () => {
                         if (kp1 && kp2) return (<line key={`bone-${idx}`} x1={kp1.x} y1={kp1.y} x2={kp2.x} y2={kp2.y} stroke="#0ea5e9" strokeWidth={Math.max(naturalSize.w / 400, 2)} strokeOpacity="0.8" />);
                         return null;
                       })}
+
                       {validKeypoints.map((kp: any) => (
-                        <circle 
-                          key={`joint-${kp.id}`} 
-                          cx={kp.x} cy={kp.y} 
-                          r={Math.max(naturalSize.w / 180, 8)} 
-                          fill={selectedKp === kp.id ? "#ef4444" : "#3b82f6"} 
-                          stroke="#ffffff" strokeWidth={Math.max(naturalSize.w / 600, 1.5)} 
+                        <circle
+                          key={`joint-${kp.id}`}
+                          cx={kp.x} cy={kp.y}
+                          r={Math.max(naturalSize.w / 180, 8)}
+                          fill={selectedKp === kp.id ? "#ef4444" : "#3b82f6"}
+                          stroke="#ffffff" strokeWidth={Math.max(naturalSize.w / 600, 1.5)}
                           className="cursor-pointer hover:fill-yellow-400 transition-colors"
-                          onMouseDown={(e) => { e.stopPropagation(); setDraggedKp(kp.id); setSelectedKp(kp.id); }} 
+                          onMouseDown={(e) => { e.stopPropagation(); setDraggedKp(kp.id); setSelectedKp(kp.id); }}
                         />
                       ))}
                     </svg>
                   )}
                 </div>
               </div>
-              
+
               <div className="lg:w-2/5 flex flex-col bg-white overflow-hidden shrink-0">
                 <div className="p-6 pb-4 bg-white border-b border-slate-100 shrink-0">
                   <h3 className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-3 flex items-center"><Info className="w-4 h-4 mr-2" /> Información General</h3>
@@ -264,11 +283,13 @@ const CargaImagen = () => {
                       </div>
                     </div>
                   ) : (<div className="bg-red-50 p-4 rounded-xl border border-red-200 text-sm text-red-700 flex items-start shadow-sm"><AlertCircle className="w-5 h-5 mr-3 shrink-0 mt-0.5" /><p>No hay articulaciones visibles para esta persona.</p></div>)}
-
+                  
                   <div className="flex flex-col sm:flex-row gap-3 mt-6 pt-5 border-t border-slate-200 shrink-0">
-                    <button className="flex-1 py-3 border border-red-200 text-red-600 bg-white hover:bg-red-50 rounded-xl font-bold transition-colors text-sm shadow-sm" onClick={handleCloseModal}>Descartar Análisis</button>
-                    <button className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-md shadow-indigo-200 hover:shadow-lg text-sm flex justify-center items-center" onClick={handleSaveResults}>
-                      <Download className="w-4 h-4 mr-2" /> Guardar Resultados
+                    <button className="flex-1 py-3 border border-red-200 text-red-600 bg-white hover:bg-red-50 rounded-xl font-bold transition-colors text-sm shadow-sm" onClick={handleCloseModal}>
+                      Descartar Análisis
+                    </button>
+                    <button className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition-all shadow-md shadow-green-200 hover:shadow-lg text-sm flex justify-center items-center" onClick={handleAddToBatch}>
+                      <PlusCircle className="w-5 h-5 mr-2" /> Añadir al Conjunto
                     </button>
                   </div>
                 </div>

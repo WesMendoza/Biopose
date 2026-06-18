@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { API_BASE } from '../config';
 import api from '../lib/api';
 
@@ -22,6 +22,22 @@ export const useVideoDetection = () => {
   const [processedStreamUrl, setProcessedStreamUrl] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // === NUEVO: Referencia secreta para recordar el ID del video si cambiamos de pantalla ===
+  const currentVideoIdRef = useRef<string | number | null>(null);
+
+  // === NUEVO: El "Testamento" de React ===
+  // Esto solo se ejecuta cuando el usuario ABANDONA la pantalla
+  useEffect(() => {
+    return () => {
+      // Si el componente muere y quedó un video registrado, lo mandamos a borrar
+      if (currentVideoIdRef.current) {
+        // Al cambiar de pantalla usamos un borrado silencioso (.catch vacío)
+        api.del(`/api/analysis/media/videos/${currentVideoIdRef.current}/`)
+           .catch(() => console.log("Limpieza silenciosa al cambiar de pantalla."));
+      }
+    };
+  }, []);
 
   const resolveUrl = (path: string) => {
     if (!path) return path;
@@ -29,16 +45,18 @@ export const useVideoDetection = () => {
     return `${API_BASE.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
   };
 
-  const loadKeypointsJson = async (path: string) => {
+  const loadKeypointsJson = async (videoId: number | string) => {
     try {
-      const url = resolveUrl(path);
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('No se pudo cargar los keypoints JSON.');
-      const json = await response.json();
-      setKeypointsData(json);
-      setJsonKeypointsUrl(url);
+      const response = await api.get(`/api/analysis/videos/${videoId}/keypoints-json/`);
+      
+      if (response && response.keypoints) {
+        setKeypointsData(response.keypoints);
+        setJsonKeypointsUrl(`/api/analysis/videos/${videoId}/keypoints-json/`);
+      } else {
+        throw new Error('La respuesta de la API no contiene los keypoints.');
+      }
     } catch (error) {
-      console.warn('Error cargando JSON de keypoints:', error);
+      console.warn('Error cargando JSON de keypoints a través de la API:', error);
     }
   };
 
@@ -76,6 +94,9 @@ export const useVideoDetection = () => {
         throw new Error('No se recibió el ID del video subido.');
       }
 
+      // === NUEVO: Guardamos el ID en la referencia secreta ===
+      currentVideoIdRef.current = createdVideoId;
+
       setProgress(30);
 
       await api.post(`/api/analysis/videos/${createdVideoId}/process/`, {
@@ -103,10 +124,8 @@ export const useVideoDetection = () => {
               setDownloadUrl(resolveUrl(streamUrl));
             }
 
-            const jsonPath = resStatus.rutaJsonKeypoints || resStatus.analysis_report?.rutaJsonKeypoints || resStatus.ruta_json_keypoints || null;
-            if (jsonPath) {
-              await loadKeypointsJson(jsonPath);
-            }
+            await loadKeypointsJson(createdVideoId);
+            
           } else if (resStatus?.status === 'processing') {
             setProgress((prev) => (prev < 90 ? prev + 5 : 90));
           } else if (resStatus?.status === 'failed') {
@@ -131,7 +150,18 @@ export const useVideoDetection = () => {
     }
   };
 
-  const handleReuploadClick = () => {
+  const handleReuploadClick = async () => {
+    // === NUEVO: Limpiamos el servidor si hacemos clic en Procesar Nuevo Video ===
+    if (currentVideoIdRef.current) {
+      try {
+        await api.del(`/api/analysis/media/videos/${currentVideoIdRef.current}/`);
+      } catch (error) {
+        console.warn("No se pudo eliminar el archivo temporal del servidor", error);
+      }
+      // Vaciamos la referencia para que el testamento (Unmount) no lo intente borrar de nuevo
+      currentVideoIdRef.current = null;
+    }
+
     setFile(null);
     setVideoUrl(null);
     setIsProcessing(false);
@@ -161,9 +191,9 @@ export const useVideoDetection = () => {
     setPoseMode,
     confidenceThreshold,
     setConfidenceThreshold,
-    processedStreamUrl,  // <-- Exportamos la URL del streaming
-    downloadUrl,         // <-- Exportamos la URL de descarga
-    analysisResults,     // <-- Exportamos los resultados
+    processedStreamUrl,
+    downloadUrl,
+    analysisResults,
     analysisReport,
     jsonKeypointsUrl,
     keypointsData,

@@ -13,9 +13,8 @@ export const useCargaImagen = () => {
   const [poseResults, setPoseResults] = useState<any>(null);
   const [imageId, setImageId] = useState<number | null>(null);
   
-  // === RUTAS COMENTADAS ===
-  // const [selectedPath, setSelectedPath] = useState('');
-  // const [paths, setPaths] = useState<any[]>([]);
+  // === ESTADO PARA EL "CARRITO" DE LOTES ===
+  const [batchResults, setBatchResults] = useState<any[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -23,19 +22,10 @@ export const useCargaImagen = () => {
     const cargarRutas = async () => {
       const token = localStorage.getItem('token');
       if (!token) return;
-      
       try {
         const decoded: any = jwtDecode(token);
         const idEmpresa = decoded.idEmpresa;
-        
-        const response = await api.get(`/api/menuOpciones/rutas/configurar/?idEmpresa=${idEmpresa}`);
-        if (Array.isArray(response)) {
-            // === RUTAS COMENTADAS ===
-            // const soloSubRutas = response.filter((item: any) => 
-            //     item.codigo && item.codigo.startsWith('SUBRUTA_')
-            // );
-            // setPaths(soloSubRutas);
-        }
+        await api.get(`/api/menuOpciones/rutas/configurar/?idEmpresa=${idEmpresa}`);
       } catch (error) {
         console.error("Error al cargar rutas:", error);
       }
@@ -61,13 +51,6 @@ export const useCargaImagen = () => {
 
   const handleGeneratePose = async () => {
     if (!file) return;
-    
-    // === VALIDACIÓN DE RUTA COMENTADA ===
-    // if (!selectedPath) {
-    //   alert("Por favor selecciona una ruta de guardado antes de procesar.");
-    //   return;
-    // }
-
     setIsPreviewModalOpen(false);
     setIsProcessing(true);
 
@@ -92,35 +75,87 @@ export const useCargaImagen = () => {
     }
   };
 
+  // === AÑADIR AL CONJUNTO ===
+  const handleAddToBatch = () => {
+    if (!imageId || !poseResults) return;
+
+    setBatchResults(prev => [...prev, {
+      imageId: imageId,
+      results: poseResults,
+      originalName: file?.name || `Imagen_${imageId}`,
+      previewUrl: imageUrl 
+    }]);
+
+    setIsPoseModalOpen(false);
+    setFile(null);
+    setImageUrl(null);
+    setPoseResults(null);
+    setImageId(null);
+  };
+
+  // === DESCARGAR TODO EL LOTE ===
+  const handleDownloadBatch = async () => {
+    if (batchResults.length === 0) {
+      alert("No hay imágenes en el conjunto para descargar.");
+      return;
+    }
+
+    try {
+      const blob = await api.postBlob(`/api/analysis/pose/batch/save-to-disk/`, {
+        batch: batchResults
+      });
+      
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Dataset_Lote_${batchResults.length}_Imagenes.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      setBatchResults([]); 
+      
+    } catch (error: any) {
+      console.error("Error al exportar lote a disco:", error);
+      alert("Error al intentar descargar el archivo ZIP del lote.");
+    }
+  };
+
+  // === ELIMINAR UNA IMAGEN DEL CONJUNTO ===
+  const handleRemoveFromBatch = async (indexToRemove: number) => {
+    const itemToRemove = batchResults[indexToRemove];
+    
+    // Eliminación lógica del carrito
+    setBatchResults(prev => prev.filter((_, index) => index !== indexToRemove));
+    
+    // Opcional: Intentar borrar la imagen del servidor si la quitan del carrito
+    try {
+        await api.del(`/api/analysis/media/images/${itemToRemove.imageId}/`);
+    } catch(e) {
+        console.warn("No se pudo limpiar la imagen descartada del servidor.");
+    }
+  };
+
   const handleSaveResults = async () => {
-    // === VALIDACIÓN MODIFICADA (Ya no exige selectedPath) ===
     if (!imageId || !poseResults) {
       alert("Faltan datos de configuración o análisis previo para guardar.");
       return;
     }
 
     try {
-      // 1. Usamos api.postBlob para descargar el ZIP desde el backend
       const blob = await api.postBlob(`/api/analysis/pose/image/${imageId}/save-to-disk/`, {
-        // target_path: selectedPath, // YA NO ENVIAMOS ESTO
         results: poseResults
       });
-      
-      // 2. Creamos una URL temporal
       const url = window.URL.createObjectURL(blob);
-      
-      // 3. Forzamos la descarga en el navegador
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `Dataset_Imagen_${imageId}.zip`);
       document.body.appendChild(link);
       link.click();
-      
-      // 4. Limpieza de memoria
       link.parentNode?.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      alert("¡Dataset descargado exitosamente!");
       setIsPoseModalOpen(false); 
     } catch (error: any) {
       console.error("Error al exportar a disco:", error);
@@ -133,9 +168,9 @@ export const useCargaImagen = () => {
     isProcessing, isPreviewModalOpen, setIsPreviewModalOpen,
     isPoseModalOpen, setIsPoseModalOpen,
     poseResults, setPoseResults, 
-    imageId, 
-    // selectedPath, setSelectedPath, paths, // === COMENTADO ===
+    imageId, batchResults, 
     fileInputRef, handleFileChange, handleProcessClick,
-    handleGeneratePose, handleSaveResults
+    handleGeneratePose, handleSaveResults,
+    handleAddToBatch, handleDownloadBatch, handleRemoveFromBatch
   };
 };
