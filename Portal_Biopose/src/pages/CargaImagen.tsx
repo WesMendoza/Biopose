@@ -1,20 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { CheckCircle, CloudUpload, Image as ImageIcon, Loader, Settings, X, ZoomIn, ZoomOut, Maximize, AlertCircle, User, Info, Download, Trash2, PlusCircle } from 'lucide-react';
 import { useCargaImagen } from '../hooks/useCargaImagen';
-
-const KEYPOINT_NAMES: Record<number, string> = {
-  0: "Nariz", 1: "Ojo Izquierdo", 2: "Ojo Derecho", 3: "Oreja Izquierda", 4: "Oreja Derecha",
-  5: "Hombro Izquierdo", 6: "Hombro Derecho", 7: "Codo Izquierdo", 8: "Codo Derecho",
-  9: "Muñeca Izquierda", 10: "Muñeca Derecha", 11: "Cadera Izquierda", 12: "Cadera Derecha",
-  13: "Rodilla Izquierda", 14: "Rodilla Derecha", 15: "Tobillo Izquierdo", 16: "Tobillo Derecho"
-};
-
-const POSE_CONNECTIONS = [
-  [0, 1], [0, 2], [1, 3], [2, 4],
-  [5, 6], [5, 7], [7, 9], [6, 8], [8, 10],
-  [5, 11], [6, 12], [11, 12],
-  [11, 13], [13, 15], [12, 14], [14, 16]
-];
+import { KEYPOINT_NAMES, POSE_CONNECTIONS } from '../utils/ai-visuals';
 
 const CargaImagen = () => {
   const {
@@ -64,6 +51,7 @@ const CargaImagen = () => {
         if (kpIndex > -1) {
           person.keypoints[kpIndex].x = svgP.x;
           person.keypoints[kpIndex].y = svgP.y;
+          person.keypoints[kpIndex].confidence = 1.0;
         }
         return newRes;
       });
@@ -88,6 +76,8 @@ const CargaImagen = () => {
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Carga de Imagen</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        {/* --- COLUMNA 1: CONFIGURACIÓN Y LOTE --- */}
         <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100 flex flex-col">
           <h4 className="text-lg font-semibold text-gray-700 flex items-center mb-4">
             <Settings className="w-5 h-5 mr-2 text-indigo-500" /> Configuración de Extracción
@@ -103,35 +93,8 @@ const CargaImagen = () => {
               </select>
             </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100 flex flex-col">
-          <h4 className="text-lg font-semibold text-gray-700 flex items-center mb-4"><ImageIcon className="w-5 h-5 mr-2 text-indigo-500" /> Cargar Archivo</h4>
-          <hr className="mb-4 border-gray-200" />
-          <div className="flex-grow flex flex-col justify-center items-center">
-            <div className="w-full border-2 border-dashed border-indigo-300 rounded-lg p-8 text-center hover:bg-indigo-50 transition-colors cursor-pointer relative" onClick={() => fileInputRef.current?.click()}>
-              <input type="file" accept="image/*" onChange={handleFileChange} ref={fileInputRef} className="hidden" />
-              {imageUrl ? (
-                <div className="flex flex-col items-center">
-                  <img src={imageUrl} alt="preview" className="h-32 mb-4 rounded border border-gray-300 object-cover shadow-sm" />
-                  <p className="text-sm font-medium text-indigo-600">{file?.name}</p>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center">
-                  <CloudUpload className="w-12 h-12 text-indigo-400 mb-3" />
-                  <p className="text-gray-600 font-medium">Arrastra y suelta tu archivo aquí</p>
-                </div>
-              )}
-            </div>
-            {imageUrl && (
-              <button onClick={handleProcessClick} disabled={isProcessing} className="mt-6 w-full flex justify-center items-center px-4 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 font-medium shadow-md transition-all">
-                {isProcessing ? <Loader className="w-5 h-5 mr-2 animate-spin" /> : <CheckCircle className="w-5 h-5 mr-2" />}
-                {isProcessing ? 'Procesando...' : 'Procesar Imagen'}
-              </button>
-            )}
-          </div>
-
-          {/* ZONA DEL CARRITO / LOTE */}
+          {/* === ZONA DEL CARRITO / LOTE === */}
           {batchResults.length > 0 && (
             <div className="mt-8 border-t border-gray-200 pt-6">
               <h4 className="text-md font-bold text-gray-800 mb-3 flex items-center justify-between">
@@ -166,8 +129,38 @@ const CargaImagen = () => {
             </div>
           )}
         </div>
+
+        {/* --- COLUMNA 2: CARGA DE ARCHIVO --- */}
+        <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100 flex flex-col">
+          <h4 className="text-lg font-semibold text-gray-700 flex items-center mb-4"><ImageIcon className="w-5 h-5 mr-2 text-indigo-500" /> Cargar Archivo</h4>
+          <hr className="mb-4 border-gray-200" />
+          <div className="flex-grow flex flex-col justify-center items-center">
+            <div className="w-full border-2 border-dashed border-indigo-300 rounded-lg p-8 text-center hover:bg-indigo-50 transition-colors cursor-pointer relative" onClick={() => fileInputRef.current?.click()}>
+              <input type="file" accept="image/*" onChange={handleFileChange} ref={fileInputRef} className="hidden" />
+              {imageUrl ? (
+                <div className="flex flex-col items-center">
+                  <img src={imageUrl} alt="preview" className="h-32 mb-4 rounded border border-gray-300 object-cover shadow-sm" />
+                  <p className="text-sm font-medium text-indigo-600">{file?.name}</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center">
+                  <CloudUpload className="w-12 h-12 text-indigo-400 mb-3" />
+                  <p className="text-gray-600 font-medium">Arrastra y suelta tu archivo aquí</p>
+                </div>
+              )}
+            </div>
+            {imageUrl && (
+              <button onClick={handleProcessClick} disabled={isProcessing} className="mt-6 w-full flex justify-center items-center px-4 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 font-medium shadow-md transition-all">
+                {isProcessing ? <Loader className="w-5 h-5 mr-2 animate-spin" /> : <CheckCircle className="w-5 h-5 mr-2" />}
+                {isProcessing ? 'Procesando...' : 'Procesar Imagen'}
+              </button>
+            )}
+          </div>
+        </div>
+
       </div>
 
+      {/* --- MODALES --- */}
       {isPreviewModalOpen && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
@@ -192,6 +185,8 @@ const CargaImagen = () => {
               <button onClick={handleCloseModal} className="text-slate-400 hover:text-slate-700 transition-colors bg-white border border-slate-200 p-1.5 rounded-lg shadow-sm"><X className="w-5 h-5" /></button>
             </div>
             <div className="flex-grow flex flex-col lg:flex-row overflow-hidden">
+              
+              {/* === VISOR INTERACTIVO === */}
               <div
                 className="lg:w-3/5 relative bg-[#0f172a] overflow-hidden flex items-center justify-center border-r border-gray-200"
                 onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
@@ -220,10 +215,13 @@ const CargaImagen = () => {
 
                   {naturalSize.w > 0 && validKeypoints.length > 0 && (
                     <svg ref={svgRef} viewBox={`0 0 ${naturalSize.w} ${naturalSize.h}`} className="absolute inset-0 w-full h-full">
-                      {POSE_CONNECTIONS.map(([id1, id2], idx) => {
-                        const kp1 = validKeypoints.find((k: any) => k.id === id1);
-                        const kp2 = validKeypoints.find((k: any) => k.id === id2);
-                        if (kp1 && kp2) return (<line key={`bone-${idx}`} x1={kp1.x} y1={kp1.y} x2={kp2.x} y2={kp2.y} stroke="#0ea5e9" strokeWidth={Math.max(naturalSize.w / 400, 2)} strokeOpacity="0.8" />);
+                      {POSE_CONNECTIONS.map((connection, idx) => {
+                        const kp1 = validKeypoints.find((k: any) => k.id === connection.pair[0]);
+                        const kp2 = validKeypoints.find((k: any) => k.id === connection.pair[1]);
+                        if (kp1 && kp2) {
+                          // Grosor de línea más fino
+                          return (<line key={`bone-${idx}`} x1={kp1.x} y1={kp1.y} x2={kp2.x} y2={kp2.y} stroke={connection.color} strokeWidth={Math.max(naturalSize.w / 600, 1)} strokeOpacity="0.85" />);
+                        }
                         return null;
                       })}
 
@@ -231,9 +229,12 @@ const CargaImagen = () => {
                         <circle
                           key={`joint-${kp.id}`}
                           cx={kp.x} cy={kp.y}
-                          r={Math.max(naturalSize.w / 180, 8)}
-                          fill={selectedKp === kp.id ? "#ef4444" : "#3b82f6"}
-                          stroke="#ffffff" strokeWidth={Math.max(naturalSize.w / 600, 1.5)}
+                          // Radio del círculo súper pequeño (divisor de 1000)
+                          r={Math.max(naturalSize.w / 1000, 1.5)}
+                          fill={selectedKp === kp.id ? "#ef4444" : "#0ea5e9"} // Rojo si está seleccionado, Azul vivo por defecto
+                          stroke="#ffffff"
+                          // Borde blanco minúsculo
+                          strokeWidth={Math.max(naturalSize.w / 1000, 1)}
                           className="cursor-pointer hover:fill-yellow-400 transition-colors"
                           onMouseDown={(e) => { e.stopPropagation(); setDraggedKp(kp.id); setSelectedKp(kp.id); }}
                         />
@@ -243,6 +244,7 @@ const CargaImagen = () => {
                 </div>
               </div>
 
+              {/* === PANEL DERECHO DE INFORMACIÓN === */}
               <div className="lg:w-2/5 flex flex-col bg-white overflow-hidden shrink-0">
                 <div className="p-6 pb-4 bg-white border-b border-slate-100 shrink-0">
                   <h3 className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-3 flex items-center"><Info className="w-4 h-4 mr-2" /> Información General</h3>

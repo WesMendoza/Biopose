@@ -1,15 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import api from '../lib/api';
-import { jwtDecode } from 'jwt-decode'; // <-- IMPORTAMOS EL DECODIFICADOR
-
-export interface Empresa {
-  idEmpresa?: number;
-  codigoEmpresa?: string;
-  nombreEmpresa: string;
-  ruc: string;
-  direccion?: string;
-  estado?: string;
-}
+import { jwtDecode } from 'jwt-decode';
+import type { Empresa } from '../interface/Empresa';
 
 export const useEmpresas = () => {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);

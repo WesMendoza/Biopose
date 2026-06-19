@@ -1,23 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Search, AlertCircle, Image as ImageIcon, ZoomIn, ZoomOut, Maximize, User, Info, Loader, FolderOpen } from 'lucide-react';
 import { useVerificarImagenes } from '../hooks/useVerificarImagenes';
-
-// DICCIONARIOS DE CONEXIÓN
-const KEYPOINT_NAMES: Record<number, string> = {
-  0: "Nariz", 1: "Ojo Izquierdo", 2: "Ojo Derecho", 3: "Oreja Izquierda", 4: "Oreja Derecha",
-  5: "Hombro Izquierdo", 6: "Hombro Derecho", 7: "Codo Izquierdo", 8: "Codo Derecho",
-  9: "Muñeca Izquierda", 10: "Muñeca Derecha", 11: "Cadera Izquierda", 12: "Cadera Derecha",
-  13: "Rodilla Izquierda", 14: "Rodilla Derecha", 15: "Tobillo Izquierdo", 16: "Tobillo Derecho"
-};
-const POSE_CONNECTIONS = [
-  [0, 1], [0, 2], [1, 3], [2, 4], [5, 6], [5, 7], [7, 9], [6, 8], [8, 10], [5, 11], [6, 12], [11, 12], [11, 13], [13, 15], [12, 14], [14, 16]
-];
+// IMPORTAMOS LA CONFIGURACIÓN CENTRALIZADA
+import { KEYPOINT_NAMES, POSE_CONNECTIONS } from '../utils/ai-visuals';
 
 const VerificarImagenes = () => {
   const {
     folderName, selectedFile, setSelectedFile,
     imageUrl, errorFile, setErrorFile,
-    availableFiles, poseResults, isLoading, 
+    availableFiles, poseResults, setPoseResults, isLoading, 
     handleLoadImage, handleFolderSelect, folderInputRef
   } = useVerificarImagenes();
 
@@ -28,17 +19,59 @@ const VerificarImagenes = () => {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [draggedKp, setDraggedKp] = useState<number | null>(null);
 
   const handleResetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
+  
   const handleMouseDown = (e: React.MouseEvent) => {
     if (zoom <= 1) return;
     setIsDragging(true); setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
   };
+
   const handleMouseMove = (e: React.MouseEvent) => {
+    // === LÓGICA DE ARRASTRE Y CONFIANZA AL 100% ===
+    if (draggedKp !== null && svgRef.current) {
+      e.stopPropagation();
+      const svg = svgRef.current as any;
+      const CTM = svg.getScreenCTM();
+      if (!CTM) return;
+      const pt = svg.createSVGPoint();
+      pt.x = e.clientX; pt.y = e.clientY;
+      const svgP = pt.matrixTransform(CTM.inverse());
+      
+      setPoseResults((prev: any) => {
+        const newRes = { ...prev };
+        const person = newRes.persons[selectedPersonIndex];
+        const kpIndex = person.keypoints.findIndex((k: any) => k.id === draggedKp);
+        if (kpIndex > -1) {
+          // Desnormalizamos las coordenadas si es un video
+          if (isVideo && !isNormalized) {
+            const YOLO_RESOLUTION = 640; 
+            const scaleX = naturalSize.w / YOLO_RESOLUTION;
+            const scaleY = naturalSize.h / YOLO_RESOLUTION;
+            person.keypoints[kpIndex].x = svgP.x / scaleX;
+            person.keypoints[kpIndex].y = svgP.y / scaleY;
+          } else {
+            person.keypoints[kpIndex].x = svgP.x;
+            person.keypoints[kpIndex].y = svgP.y;
+          }
+          // ¡Confirmación humana al 100%!
+          person.keypoints[kpIndex].confidence = 1.0;
+        }
+        return newRes;
+      });
+      return;
+    }
+
     if (!isDragging) return;
     setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
   };
-  const handleMouseUp = () => setIsDragging(false);
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    setDraggedKp(null);
+  };
 
   const currentPerson = poseResults?.persons?.[selectedPersonIndex];
   const validKeypoints = currentPerson?.keypoints?.filter((kp: any) => {
@@ -75,7 +108,6 @@ const VerificarImagenes = () => {
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
           
-          {/* NUEVO BOTÓN DE CARPETA (Reemplaza al antiguo Select de Rutas) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Carpeta del Dataset (ZIP extraído)</label>
             <button 
@@ -87,7 +119,6 @@ const VerificarImagenes = () => {
             </button>
             <input 
               type="file" 
-              // Estos atributos son vitales para permitir seleccionar carpetas enteras
               // @ts-ignore
               webkitdirectory="true" 
               directory="true" 
@@ -140,8 +171,8 @@ const VerificarImagenes = () => {
               className="relative origin-center inline-block"
               style={{ 
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
-                transitionProperty: 'transform', transitionDuration: isDragging ? '0ms' : '200ms', transitionTimingFunction: 'ease-out'
+                cursor: draggedKp ? 'grabbing' : (zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'),
+                transitionProperty: 'transform', transitionDuration: isDragging || draggedKp ? '0ms' : '200ms', transitionTimingFunction: 'ease-out'
               }}
             >
               <img 
@@ -153,21 +184,33 @@ const VerificarImagenes = () => {
               />
 
               {naturalSize.w > 0 && poseResults && validKeypoints.length > 0 && (
-                <svg viewBox={`0 0 ${naturalSize.w} ${naturalSize.h}`} className="absolute inset-0 w-full h-full pointer-events-none">
-                  {POSE_CONNECTIONS.map(([id1, id2], idx) => {
-                    const kp1 = validKeypoints.find((k: any) => k.id === id1);
-                    const kp2 = validKeypoints.find((k: any) => k.id === id2);
+                <svg ref={svgRef} viewBox={`0 0 ${naturalSize.w} ${naturalSize.h}`} className="absolute inset-0 w-full h-full">
+                  {/* LÍNEAS DE COLORES */}
+                  {POSE_CONNECTIONS.map((connection, idx) => {
+                    const kp1 = validKeypoints.find((k: any) => k.id === connection.pair[0]);
+                    const kp2 = validKeypoints.find((k: any) => k.id === connection.pair[1]);
                     if (kp1 && kp2) {
                       const p1 = getRealCoords(kp1.x, kp1.y);
                       const p2 = getRealCoords(kp2.x, kp2.y);
-                      return <line key={`bone-${idx}`} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="#0ea5e9" strokeWidth={Math.max(naturalSize.w / 400, 2)} strokeOpacity="0.8" />;
+                      return <line key={`bone-${idx}`} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={connection.color} strokeWidth={Math.max(naturalSize.w / 600, 1)} strokeOpacity="0.85" />;
                     }
                     return null;
                   })}
+                  {/* PUNTOS REDUCIDOS DE TAMAÑO */}
                   {validKeypoints.map((kp: any) => {
                     const p = getRealCoords(kp.x, kp.y);
-                    return <circle key={`joint-${kp.id}`} cx={p.x} cy={p.y} r={Math.max(naturalSize.w / 250, 4)} fill={selectedKp === kp.id ? "#ef4444" : "#3b82f6"} stroke="#ffffff" strokeWidth={Math.max(naturalSize.w / 600, 1.5)} />;
+                    return (
+                      <circle 
+                        key={`joint-${kp.id}`} cx={p.x} cy={p.y} 
+                        r={Math.max(naturalSize.w / 1000, 1.5)} 
+                        fill={selectedKp === kp.id ? "#ef4444" : "#0ea5e9"} 
+                        stroke="#ffffff" strokeWidth={Math.max(naturalSize.w / 1200, 0.5)} 
+                        className="cursor-pointer hover:fill-yellow-400 transition-colors"
+                        onMouseDown={(e) => { e.stopPropagation(); setDraggedKp(kp.id); setSelectedKp(kp.id); }}
+                      />
+                    );
                   })}
+                  {/* RADAR */}
                   {selectedKp !== null && validKeypoints.filter((k: any) => k.id === selectedKp).map((kp: any) => {
                     const p = getRealCoords(kp.x, kp.y);
                     return <circle key={`radar-${kp.id}`} cx={p.x} cy={p.y} r={Math.max(naturalSize.w / 40, 15)} className="animate-ping origin-center" fill="none" stroke="#ef4444" strokeWidth={Math.max(naturalSize.w / 300, 2)} />;
@@ -177,13 +220,13 @@ const VerificarImagenes = () => {
             </div>
           </div>
           
-          {/* LADO DERECHO: Detalles (Solo si hay JSON) */}
+          {/* LADO DERECHO: Detalles */}
           <div className="lg:w-2/5 flex flex-col overflow-hidden bg-white">
             {!poseResults ? (
               <div className="p-8 h-full flex flex-col items-center justify-center text-center">
                 <AlertCircle className="w-16 h-16 text-orange-200 mb-4" />
                 <h3 className="text-xl font-bold text-gray-700">Sin Datos de Análisis</h3>
-                <p className="text-gray-500 mt-2">Esta imagen no tiene un archivo JSON de resultados o el formato no coincide con el seleccionado.</p>
+                <p className="text-gray-500 mt-2">Esta imagen no tiene un archivo JSON de resultados o el formato no coincide.</p>
               </div>
             ) : (
               <>
@@ -223,7 +266,7 @@ const VerificarImagenes = () => {
                       })}
                     </div>
                   ) : (
-                     <div className="text-center p-6 text-sm text-gray-400">Selecciona una persona válida para ver sus coordenadas.</div>
+                      <div className="text-center p-6 text-sm text-gray-400">Selecciona una persona válida para ver sus coordenadas.</div>
                   )}
                 </div>
               </>
@@ -240,5 +283,5 @@ const VerificarImagenes = () => {
     </div>
   );
 };
-
+ 
 export default VerificarImagenes;

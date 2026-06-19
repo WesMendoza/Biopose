@@ -14,46 +14,74 @@ import LiveActionMultiPerson from './pages/LiveActionMultiPerson';
 import Layout from './components/Layout';
 import GestionEmpresas from './pages/GestionEmpresas';
 import GestionRoles from './pages/GestionRoles';
+import ProtectedRoute from './utils/ProtectedRoute';
 
 const AppRouter = () => {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Default root -> show login first */}
         <Route path="/" element={<Navigate to="/login" replace />} />
-
         <Route path="/login" element={<Login />} />
         <Route path="/create-account" element={<CreateAccount />} />
 
         {/* Protected Routes under /app (Layout) */}
         <Route path="/app" element={<Layout />}>
           <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="users" element={<GestionUsuarios />} />
+          
+          {/* Dashboard no le pasamos requiredRoute porque es público para todos los logueados */}
+          <Route path="dashboard" element={
+            <ProtectedRoute><Dashboard /></ProtectedRoute>
+          } />
 
+          {/* =================== ADMINISTRACIÓN =================== */}
+          <Route path="users" element={
+            <ProtectedRoute requiredRoute="/app/users"><GestionUsuarios /></ProtectedRoute>
+          } />
+          <Route path="gestion-empresas" element={
+            <ProtectedRoute requiredRoute="/app/gestion-empresas"><GestionEmpresas /></ProtectedRoute>
+          } />
+          <Route path="gestion-roles" element={
+            <ProtectedRoute requiredRoute="/app/gestion-roles"><GestionRoles /></ProtectedRoute>
+          } />
+
+          {/* =================== MÓDULOS DE POSE =================== */}
           <Route path="pose">
-            <Route path="routes" element={<ConfiguracionRutas />} />
-            <Route path="image" element={<CargaImagen />} />
-            <Route path="video" element={<GenerarImagenes />} />
-            <Route path="verify" element={<VerificarImagenes />} />
+            <Route path="routes" element={
+              <ProtectedRoute requiredRoute="/app/pose/routes"><ConfiguracionRutas /></ProtectedRoute>
+            } />
+            <Route path="image" element={
+              <ProtectedRoute requiredRoute="/app/pose/image"><CargaImagen /></ProtectedRoute>
+            } />
+            <Route path="video" element={
+              <ProtectedRoute requiredRoute="/app/pose/video"><GenerarImagenes /></ProtectedRoute>
+            } />
+            <Route path="verify" element={
+              <ProtectedRoute requiredRoute="/app/pose/verify"><VerificarImagenes /></ProtectedRoute>
+            } />
           </Route>
 
+          {/* =================== DETECCIÓN DE EVENTOS =================== */}
           <Route path="events">
             <Route path="individual">
-              <Route path="video" element={<VideoDetection />} />
-              <Route path="live" element={<LiveDetection />} />
+              <Route path="video" element={
+                <ProtectedRoute requiredRoute="/app/events/individual/video"><VideoDetection /></ProtectedRoute>
+              } />
+              <Route path="live" element={
+                <ProtectedRoute requiredRoute="/app/events/individual/live"><LiveDetection /></ProtectedRoute>
+              } />
             </Route>
             <Route path="multi">
-              <Route path="video" element={<VideoActionMultiPerson />} />
-              <Route path="live" element={<LiveActionMultiPerson />} />
+              <Route path="video" element={
+                <ProtectedRoute requiredRoute="/app/events/multi/video"><VideoActionMultiPerson /></ProtectedRoute>
+              } />
+              <Route path="live" element={
+                <ProtectedRoute requiredRoute="/app/events/multi/live"><LiveActionMultiPerson /></ProtectedRoute>
+              } />
             </Route>
           </Route>
 
-          <Route path="gestion-empresas" element={<GestionEmpresas />} />
-          <Route path="gestion-roles" element={<GestionRoles />} />
         </Route>
 
-        {/* Fallback: redirect unknown routes to login */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>

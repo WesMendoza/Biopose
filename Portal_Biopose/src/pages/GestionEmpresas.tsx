@@ -1,26 +1,19 @@
-import { Edit2, Plus, Save, Trash2, X } from 'lucide-react';
+import { Edit2, Save, Trash2, X } from 'lucide-react';
 import { useEmpresas } from '../hooks/useEmpresas';
 
 const GestionEmpresas = () => {
   const {
     empresas, loading,
-    isEditModalOpen, isDeleteModalOpen, isCreateModalOpen,
+    isEditModalOpen, isDeleteModalOpen,
     selectedEmpresa, setSelectedEmpresa,
-    nuevaEmpresa, setNuevaEmpresa,
-    handleCreateClick, handleEditClick, handleDeleteClick,
-    closeModals, handleCreateEmpresa, handleSaveEmpresa, confirmDelete
+    handleEditClick, handleDeleteClick,
+    closeModals, handleSaveEmpresa, confirmDelete
   } = useEmpresas();
 
   return (
     <div className="p-8">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-800">Gestión de Empresas</h1>
-        <button 
-          onClick={handleCreateClick}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-        >
-          <Plus size={20} /><span>Crear Empresa</span>
-        </button>
       </div>
 
       <div className="overflow-x-auto bg-white rounded-lg shadow">
@@ -57,25 +50,6 @@ const GestionEmpresas = () => {
           </tbody>
         </table>
       </div>
-
-      {/* Modal Crear */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
-            <button onClick={closeModals} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"><X size={20} /></button>
-            <h2 className="text-xl font-bold mb-4">Crear Empresa</h2>
-            <div className="space-y-4">
-              <input type="text" placeholder="Nombre" value={nuevaEmpresa.nombreEmpresa} onChange={(e) => setNuevaEmpresa({ ...nuevaEmpresa, nombreEmpresa: e.target.value })} className="w-full p-2 border rounded-md" />
-              <input type="text" placeholder="RUC" value={nuevaEmpresa.ruc} onChange={(e) => setNuevaEmpresa({ ...nuevaEmpresa, ruc: e.target.value })} className="w-full p-2 border rounded-md" />
-              <input type="text" placeholder="Dirección" value={nuevaEmpresa.direccion} onChange={(e) => setNuevaEmpresa({ ...nuevaEmpresa, direccion: e.target.value })} className="w-full p-2 border rounded-md" />
-            </div>
-            <div className="mt-6 flex justify-end space-x-3">
-              <button onClick={closeModals} className="px-4 py-2 border rounded-md">Cancelar</button>
-              <button onClick={handleCreateEmpresa} className="px-4 py-2 bg-blue-600 text-white rounded-md flex items-center space-x-2"><Save size={18} /><span>Guardar</span></button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal Editar */}
       {isEditModalOpen && selectedEmpresa && (

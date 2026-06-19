@@ -6,7 +6,6 @@ import {
   Building2, Shield
 } from 'lucide-react';
 import { useSidebar } from '../hooks/useSidebar';
-import { jwtDecode } from 'jwt-decode'; // <-- IMPORTAMOS EL DECODIFICADOR
 
 const Sidebar = () => {
   const {
@@ -16,32 +15,20 @@ const Sidebar = () => {
     toggleSidebar,
     handleLogout,
     navLinkClass,
-    subNavLinkClass
+    subNavLinkClass,
+    tieneAcceso,
+    cargandoMenu
   } = useSidebar();
 
-  // 1. OBTENEMOS EL ROL DEL USUARIO
-  let esAdministrador = false;
-  try {
-    const token = localStorage.getItem('token');
-    if (token) {
-      const decoded: any = jwtDecode(token);
-      // Buscamos el rol en texto (por si acaso)
-      const rolTexto = String(decoded.nombreRol || decoded.rol || decoded.role || '').toLowerCase();
-      
-      // Buscamos el ID del rol (que es lo que realmente envía tu BD)
-      const idRol = Number(decoded.idRol);
-
-      // ERES ADMINISTRADOR SI: 
-      // 1. El texto dice 'admin' OR 
-      // 2. Tienes el idRol 1 (Admin Emp 1) OR 
-      // 3. Tienes el idRol 5 (Admin Emp 2)
-      if (rolTexto.includes('admin') || idRol === 1 || idRol === 5) {
-        esAdministrador = true;
-      }
-    }
-  } catch (error) {
-    console.error("Error al decodificar token en Sidebar:", error);
+  // Ocultamos el menú temporalmente mientras se descarga la configuración de seguridad
+  if (cargandoMenu) {
+    return <div className="bg-gray-900 w-20 h-screen flex justify-center pt-10"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div></div>;
   }
+
+  // Comprobamos si el usuario tiene acceso a *alguna* de las opciones hijas para pintar el contenedor padre
+  const showPoseSection = tieneAcceso('/app/pose/routes') || tieneAcceso('/app/pose/image') || tieneAcceso('/app/pose/video') || tieneAcceso('/app/pose/verify');
+  const showEventsSection = tieneAcceso('/app/events/individual/video') || tieneAcceso('/app/events/individual/live') || tieneAcceso('/app/events/multi/video') || tieneAcceso('/app/events/multi/live');
+  const showAdminSection = tieneAcceso('/app/users') || tieneAcceso('/app/gestion-empresas') || tieneAcceso('/app/gestion-roles');
 
   return (
     <>
@@ -67,16 +54,18 @@ const Sidebar = () => {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-2 overflow-x-hidden">
+        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-2 overflow-x-hidden custom-scrollbar">
+          
+          {/* El Dashboard (Home) suele ser público para todos los logueados, o puedes envolverlo en tieneAcceso('/app/dashboard') */}
           <NavLink to="/app/dashboard" className={navLinkClass} title="Home">
             <Home className="w-5 h-5 flex-shrink-0" />
             {isSidebarOpen && <span>Home</span>}
           </NavLink>
 
           {/* ========================================== */}
-          {/* SECCIÓN RESTRINGIDA SOLO PARA ADMINISTRADOR  */}
+          {/* SECCIÓN DE ADMINISTRACIÓN                  */}
           {/* ========================================== */}
-          {esAdministrador && (
+          {showAdminSection && (
             <>
               {isSidebarOpen && (
                 <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider pl-4 mb-2 mt-4">
@@ -84,112 +73,141 @@ const Sidebar = () => {
                 </div>
               )}
               
-              <NavLink to="/app/users" className={navLinkClass} title="Gestión de Usuarios">
-                <Users className="w-5 h-5 flex-shrink-0" />
-                {isSidebarOpen && <span>Gestión de Usuarios</span>}
-              </NavLink>
+              {tieneAcceso('/app/users') && (
+                <NavLink to="/app/users" className={navLinkClass} title="Gestión de Usuarios">
+                  <Users className="w-5 h-5 flex-shrink-0" />
+                  {isSidebarOpen && <span>Gestión de Usuarios</span>}
+                </NavLink>
+              )}
 
-              <NavLink to="/app/gestion-empresas" className={navLinkClass} title="Gestión de Empresas">
-                <Building2 className="w-5 h-5 flex-shrink-0" />
-                {isSidebarOpen && <span>Gestión de Empresas</span>}
-              </NavLink>
+              {tieneAcceso('/app/gestion-empresas') && (
+                <NavLink to="/app/gestion-empresas" className={navLinkClass} title="Gestión de Empresas">
+                  <Building2 className="w-5 h-5 flex-shrink-0" />
+                  {isSidebarOpen && <span>Gestión de Empresas</span>}
+                </NavLink>
+              )}
 
-              <NavLink to="/app/gestion-roles" className={navLinkClass} title="Gestión de Roles">
-                <Shield className="w-5 h-5 flex-shrink-0" />
-                {isSidebarOpen && <span>Gestión de Roles</span>}
-              </NavLink>
+              {tieneAcceso('/app/gestion-roles') && (
+                <NavLink to="/app/gestion-roles" className={navLinkClass} title="Gestión de Roles">
+                  <Shield className="w-5 h-5 flex-shrink-0" />
+                  {isSidebarOpen && <span>Gestión de Roles</span>}
+                </NavLink>
+              )}
             </>
           )}
+
           {/* ========================================== */}
-          
-          {isSidebarOpen && (
+          {/* MÓDULOS DE IA                              */}
+          {/* ========================================== */}
+          {(showPoseSection || showEventsSection) && isSidebarOpen && (
             <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider pl-4 mb-2 mt-4">
               Módulos IA
             </div>
           )}
 
-          {/* Pose Estimation Section */}
-          <div>
-            <button 
-              onClick={() => toggleSection('pose')}
-              title="Estimación de posturas"
-              className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors ${openSection === 'pose' ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800'} ${isSidebarOpen ? 'justify-between' : 'justify-center'}`}
-            >
-              <div className="flex items-center space-x-3">
-                <UserCheck className="w-5 h-5 flex-shrink-0" />
-                {isSidebarOpen && <span>Estimación de posturas</span>}
-              </div>
-              {isSidebarOpen && (openSection === 'pose' ? <ChevronDown className="w-4 h-4 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 flex-shrink-0" />)}
-            </button>
-            
-            {openSection === 'pose' && (
-              <div className="mt-1 space-y-1">
-                <NavLink to="/app/pose/routes" className={subNavLinkClass} title="Configuración de rutas">
-                  <FolderOpen className="w-4 h-4 flex-shrink-0" />
-                  {isSidebarOpen && <span>Configuración de rutas</span>}
-                </NavLink>
-                <NavLink to="/app/pose/image" className={subNavLinkClass} title="Detección en imagen">
-                  <ImageIcon className="w-4 h-4 flex-shrink-0" />
-                  {isSidebarOpen && <span>Detección en imagen</span>}
-                </NavLink>
-                <NavLink to="/app/pose/video" className={subNavLinkClass} title="Detección en video">
-                  <Film className="w-4 h-4 flex-shrink-0" />
-                  {isSidebarOpen && <span>Detección en video</span>}
-                </NavLink>
-                <NavLink to="/app/pose/verify" className={subNavLinkClass} title="Verifica tus imágenes">
-                  <UserCheck className="w-4 h-4 flex-shrink-0" />
-                  {isSidebarOpen && <span>Verifica tus imágenes</span>}
-                </NavLink>
-              </div>
-            )}
-          </div>
+          {/* POSE ESTIMATION */}
+          {showPoseSection && (
+            <div>
+              <button 
+                onClick={() => toggleSection('pose')}
+                title="Estimación de posturas"
+                className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors ${openSection === 'pose' ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800'} ${isSidebarOpen ? 'justify-between' : 'justify-center'}`}
+              >
+                <div className="flex items-center space-x-3">
+                  <UserCheck className="w-5 h-5 flex-shrink-0" />
+                  {isSidebarOpen && <span>Estimación de posturas</span>}
+                </div>
+                {isSidebarOpen && (openSection === 'pose' ? <ChevronDown className="w-4 h-4 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 flex-shrink-0" />)}
+              </button>
+              
+              {openSection === 'pose' && (
+                <div className="mt-1 space-y-1">
+                  {tieneAcceso('/app/pose/routes') && (
+                    <NavLink to="/app/pose/routes" className={subNavLinkClass} title="Configuración de rutas">
+                      <FolderOpen className="w-4 h-4 flex-shrink-0" />
+                      {isSidebarOpen && <span>Configuración de rutas</span>}
+                    </NavLink>
+                  )}
+                  {tieneAcceso('/app/pose/image') && (
+                    <NavLink to="/app/pose/image" className={subNavLinkClass} title="Detección en imagen">
+                      <ImageIcon className="w-4 h-4 flex-shrink-0" />
+                      {isSidebarOpen && <span>Detección en imagen</span>}
+                    </NavLink>
+                  )}
+                  {tieneAcceso('/app/pose/video') && (
+                    <NavLink to="/app/pose/video" className={subNavLinkClass} title="Detección en video">
+                      <Film className="w-4 h-4 flex-shrink-0" />
+                      {isSidebarOpen && <span>Detección en video</span>}
+                    </NavLink>
+                  )}
+                  {tieneAcceso('/app/pose/verify') && (
+                    <NavLink to="/app/pose/verify" className={subNavLinkClass} title="Verifica tus imágenes">
+                      <UserCheck className="w-4 h-4 flex-shrink-0" />
+                      {isSidebarOpen && <span>Verifica tus imágenes</span>}
+                    </NavLink>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
-          {/* Event Detection Section */}
-          <div>
-            <button 
-              onClick={() => toggleSection('events')}
-              title="Detección de eventos"
-              className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors ${openSection === 'events' ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800'} ${isSidebarOpen ? 'justify-between' : 'justify-center'}`}
-            >
-              <div className="flex items-center space-x-3">
-                <Video className="w-5 h-5 flex-shrink-0" />
-                {isSidebarOpen && <span>Detección de eventos</span>}
-              </div>
-              {isSidebarOpen && (openSection === 'events' ? <ChevronDown className="w-4 h-4 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 flex-shrink-0" />)}
-            </button>
+          {/* EVENT DETECTION */}
+          {showEventsSection && (
+            <div>
+              <button 
+                onClick={() => toggleSection('events')}
+                title="Detección de eventos"
+                className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors ${openSection === 'events' ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800'} ${isSidebarOpen ? 'justify-between' : 'justify-center'}`}
+              >
+                <div className="flex items-center space-x-3">
+                  <Video className="w-5 h-5 flex-shrink-0" />
+                  {isSidebarOpen && <span>Detección de eventos</span>}
+                </div>
+                {isSidebarOpen && (openSection === 'events' ? <ChevronDown className="w-4 h-4 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 flex-shrink-0" />)}
+              </button>
 
-            {openSection === 'events' && (
-              <div className="mt-1 space-y-2 pb-2">
-                {isSidebarOpen && (
-                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider pl-11 mb-2 mt-3">
-                    Individual
-                  </div>
-                )}
-                <NavLink to="/app/events/individual/video" className={subNavLinkClass} title="Detección en video (Individual)">
-                  <Film className="w-4 h-4 flex-shrink-0" />
-                  {isSidebarOpen && <span>Detección en video</span>}
-                </NavLink>
-                <NavLink to="/app/events/individual/live" className={subNavLinkClass} title="Detección en vivo (Individual)">
-                  <Video className="w-4 h-4 flex-shrink-0" />
-                  {isSidebarOpen && <span>Detección en vivo</span>}
-                </NavLink>
+              {openSection === 'events' && (
+                <div className="mt-1 space-y-2 pb-2">
+                  
+                  {/* Sub-sección Individual */}
+                  {(tieneAcceso('/app/events/individual/video') || tieneAcceso('/app/events/individual/live')) && isSidebarOpen && (
+                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider pl-11 mb-2 mt-3">Individual</div>
+                  )}
+                  
+                  {tieneAcceso('/app/events/individual/video') && (
+                    <NavLink to="/app/events/individual/video" className={subNavLinkClass} title="Detección en video (Individual)">
+                      <Film className="w-4 h-4 flex-shrink-0" />
+                      {isSidebarOpen && <span>Detección en video</span>}
+                    </NavLink>
+                  )}
+                  {tieneAcceso('/app/events/individual/live') && (
+                    <NavLink to="/app/events/individual/live" className={subNavLinkClass} title="Detección en vivo (Individual)">
+                      <Video className="w-4 h-4 flex-shrink-0" />
+                      {isSidebarOpen && <span>Detección en vivo</span>}
+                    </NavLink>
+                  )}
 
-                {isSidebarOpen && (
-                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider pl-11 mb-2 mt-4">
-                    Multipersonas
-                  </div>
-                )}
-                <NavLink to="/app/events/multi/video" className={subNavLinkClass} title="Detección en video (Multipersona)">
-                  <Film className="w-4 h-4 flex-shrink-0" />
-                  {isSidebarOpen && <span>Detección en video</span>}
-                </NavLink>
-                <NavLink to="/app/events/multi/live" className={subNavLinkClass} title="Detección en vivo (Multipersona)">
-                  <Video className="w-4 h-4 flex-shrink-0" />
-                  {isSidebarOpen && <span>Detección en vivo</span>}
-                </NavLink>
-              </div>
-            )}
-          </div>
+                  {/* Sub-sección Multipersona */}
+                  {(tieneAcceso('/app/events/multi/video') || tieneAcceso('/app/events/multi/live')) && isSidebarOpen && (
+                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider pl-11 mb-2 mt-4">Multipersonas</div>
+                  )}
+                  
+                  {tieneAcceso('/app/events/multi/video') && (
+                    <NavLink to="/app/events/multi/video" className={subNavLinkClass} title="Detección en video (Multipersona)">
+                      <Film className="w-4 h-4 flex-shrink-0" />
+                      {isSidebarOpen && <span>Detección en video</span>}
+                    </NavLink>
+                  )}
+                  {tieneAcceso('/app/events/multi/live') && (
+                    <NavLink to="/app/events/multi/live" className={subNavLinkClass} title="Detección en vivo (Multipersona)">
+                      <Video className="w-4 h-4 flex-shrink-0" />
+                      {isSidebarOpen && <span>Detección en vivo</span>}
+                    </NavLink>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="p-4 border-t border-gray-800">

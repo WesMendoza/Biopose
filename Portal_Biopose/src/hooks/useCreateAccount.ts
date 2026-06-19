@@ -16,9 +16,9 @@ export const useCreateAccount = () => {
     correo: '',
     celular: '',
     password: '',
-    codigoEmpresa: '', // Si elige Unirse
-    nombreEmpresa: '', // Si elige Crear
-    rucEmpresa: '',    // Si elige Crear
+    codigoEmpresa: '',
+    nombreEmpresa: '',
+    rucEmpresa: '',
   });
 
   const [isSuccess, setIsSuccess] = useState(false);

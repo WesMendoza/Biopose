@@ -1,14 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import api from '../lib/api';
-
-export interface Rol {
-  idRol?: number;
-  nombre: string;
-  estado?: string;
-}
+import type { MenuOpcion } from '../interface/MenuOpcion';
+import type { Rol } from '../interface/Rol';
 
 export const useRoles = () => {
   const [roles, setRoles] = useState<Rol[]>([]);
+  const [rutasDisponibles, setRutasDisponibles] = useState<MenuOpcion[]>([]);
   const [loading, setLoading] = useState(false);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -16,7 +13,7 @@ export const useRoles = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   
   const [selectedRol, setSelectedRol] = useState<Rol | null>(null);
-  const [nuevoRol, setNuevoRol] = useState<Rol>({ nombre: '' });
+  const [nuevoRol, setNuevoRol] = useState<Rol>({ nombre: '', menus_permitidos: [] });
 
   const fetchRoles = useCallback(async () => {
     setLoading(true);
@@ -27,6 +24,7 @@ export const useRoles = () => {
         idRol: rol.idRol,
         nombre: rol.nombreRol || rol.nombre || '',
         estado: rol.estado || '',
+        menus_permitidos: rol.menus_permitidos || [], 
       }));
       setRoles(mappedRoles);
     } catch (error) {
@@ -36,12 +34,25 @@ export const useRoles = () => {
     }
   }, []);
 
+  const fetchRutasDisponibles = useCallback(async () => {
+    try {
+      // CORRECCIÓN: Agregamos "opciones/" al final de la ruta
+      const res = await api.get('/api/menuOpciones/opciones/'); 
+      
+      const backendRutas = res?.detalle || res || [];
+      setRutasDisponibles(backendRutas);
+    } catch (error) {
+      console.error("Error cargando las rutas del sistema", error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchRoles();
-  }, [fetchRoles]);
+    fetchRutasDisponibles();
+  }, [fetchRoles, fetchRutasDisponibles]);
 
   const handleCreateClick = () => {
-    setNuevoRol({ nombre: '' });
+    setNuevoRol({ nombre: '', menus_permitidos: [] });
     setIsCreateModalOpen(true);
   };
 
@@ -62,10 +73,35 @@ export const useRoles = () => {
     setSelectedRol(null);
   };
 
+  const toggleMenuNuevoRol = (idMenu: number) => {
+    setNuevoRol(prev => {
+      const menus = prev.menus_permitidos || [];
+      if (menus.includes(idMenu)) {
+        return { ...prev, menus_permitidos: menus.filter(id => id !== idMenu) };
+      } else {
+        return { ...prev, menus_permitidos: [...menus, idMenu] };
+      }
+    });
+  };
+
+  const toggleMenuEditRol = (idMenu: number) => {
+    if (!selectedRol) return;
+    setSelectedRol(prev => {
+      if (!prev) return prev;
+      const menus = prev.menus_permitidos || [];
+      if (menus.includes(idMenu)) {
+        return { ...prev, menus_permitidos: menus.filter(id => id !== idMenu) };
+      } else {
+        return { ...prev, menus_permitidos: [...menus, idMenu] };
+      }
+    });
+  };
+
   const handleCreateRol = async () => {
     try {
       await api.post('/api/gestionEmpresas/roles/', {
         nombreRol: nuevoRol.nombre,
+        menus_permitidos: nuevoRol.menus_permitidos, 
       });
       await fetchRoles();
       closeModals();
@@ -79,6 +115,7 @@ export const useRoles = () => {
       try {
         await api.patch(`/api/gestionEmpresas/roles/${selectedRol.idRol}/`, {
           nombreRol: selectedRol.nombre,
+          menus_permitidos: selectedRol.menus_permitidos, 
         });
         await fetchRoles();
         closeModals();
@@ -101,11 +138,12 @@ export const useRoles = () => {
   };
 
   return {
-    roles, loading,
+    roles, loading, rutasDisponibles,
     isEditModalOpen, isDeleteModalOpen, isCreateModalOpen,
     selectedRol, setSelectedRol,
     nuevoRol, setNuevoRol,
     handleCreateClick, handleEditClick, handleDeleteClick,
+    toggleMenuNuevoRol, toggleMenuEditRol,
     closeModals, handleCreateRol, handleSaveRol, confirmDelete
   };
 };

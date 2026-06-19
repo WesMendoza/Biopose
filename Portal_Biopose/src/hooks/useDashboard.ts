@@ -1,10 +1,8 @@
 import { useEffect } from 'react';
 
 export const useDashboard = () => {
-  const userName = 'Usuario'; // Opcional: podrías extraerlo de tu JWT como en otras pantallas
-
+  const userName = 'Usuario'; 
   useEffect(() => {
-    // Animación automática de scroll (por si agregas la clase .reveal a algún elemento)
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {

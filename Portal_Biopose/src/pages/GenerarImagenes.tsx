@@ -1,15 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Upload, Settings, RefreshCw, CheckCircle, AlertTriangle, CloudUpload, Loader, Image as ImageIcon, X, ChevronLeft, ChevronRight, Download, ZoomOut, ZoomIn, Maximize, User, Info, AlertCircle } from 'lucide-react';
 import { useGenerarImagenes } from '../hooks/useGenerarImagenes';
-
-const KEYPOINT_NAMES: Record<number, string> = {
-  0: "Nariz", 1: "Ojo Izquierdo", 2: "Ojo Derecho", 3: "Oreja Izquierda", 4: "Oreja Derecha",
-  5: "Hombro Izquierdo", 6: "Hombro Derecho", 7: "Codo Izquierdo", 8: "Codo Derecho",
-  9: "Muñeca Izquierda", 10: "Muñeca Derecha", 11: "Cadera Izquierda", 12: "Cadera Derecha",
-  13: "Rodilla Izquierda", 14: "Rodilla Derecha", 15: "Tobillo Izquierdo", 16: "Tobillo Derecho"
-};
-
-const POSE_CONNECTIONS = [[0,1],[1,3],[0,2],[2,4],[5,6],[5,11],[6,12],[11,12],[5,7],[7,9],[6,8],[8,10],[11,13],[13,15],[12,14],[14,16]];
+import { KEYPOINT_NAMES, POSE_CONNECTIONS } from '../utils/ai-visuals'; 
 
 const GenerarImagenes = () => {
   const {
@@ -17,7 +9,6 @@ const GenerarImagenes = () => {
     isProcessing, isModalOpen, setIsModalOpen,
     keypointsData, setKeypointsData, resultsData, fileInputRef,
     handleFileChange, handleGenerateImages, handleReuploadClick,
-    // selectedPath, setSelectedPath, paths, // === COMENTADO ===
     handleSaveResults
   } = useGenerarImagenes();
 
@@ -25,14 +16,12 @@ const GenerarImagenes = () => {
   const hiddenVideoRef = useRef<HTMLVideoElement>(null);
   const displayCanvasRef = useRef<HTMLCanvasElement>(null);
   
-  // ESTADOS DE ARRASTRE Y ZOOM
   const svgRef = useRef<SVGSVGElement>(null);
   const [draggedKp, setDraggedKp] = useState<number | null>(null);
   const [selectedKp, setSelectedKp] = useState<number | null>(null);
   const [videoSize, setVideoSize] = useState({ w: 640, h: 640 });
   const [selectedPersonIndex, setSelectedPersonIndex] = useState<number>(0);
 
-  // ZOOM Y PAN
   const [zoom, setZoom] = useState<number>(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDraggingPan, setIsDraggingPan] = useState(false);
@@ -44,7 +33,6 @@ const GenerarImagenes = () => {
     }
   }, [isModalOpen]);
 
-  // DIBUJAR VIDEO EN CANVAS
   const drawFrameWithSkeletons = useCallback(() => {
     const video = hiddenVideoRef.current;
     const canvas = displayCanvasRef.current;
@@ -72,7 +60,6 @@ const GenerarImagenes = () => {
   }, [currentIndex, isModalOpen, drawFrameWithSkeletons]);
 
 
-  // CONTROLES DE ZOOM Y PAN
   const handleResetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
 
   const handleMouseDownPan = (e: React.MouseEvent) => {
@@ -112,6 +99,8 @@ const GenerarImagenes = () => {
               ptToUpdate.x = svgP.x / scaleX;
               ptToUpdate.y = svgP.y / scaleY;
           }
+          // Confianza al 100% por corrección humana
+          ptToUpdate.confidence = 1.0; 
         }
 
         if (frameData.keypoints_json) {
@@ -154,16 +143,13 @@ const GenerarImagenes = () => {
           <h4 className="text-lg font-semibold text-gray-700 flex items-center mb-4"><Settings className="w-5 h-5 mr-2 text-indigo-500" /> Configuración de Extracción</h4>
           <hr className="mb-4 border-gray-200" />
           <div className="space-y-6">
-            
-            {/* === COMBOBOX DE RUTAS ELIMINADO/COMENTADO === */}
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Imágenes por Segundo (FPS):</label>
               <input type="number" value={fps} onChange={(e) => setFps(Number(e.target.value))} min="1" max="24" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"/>
             </div>
             <div className="bg-indigo-50 p-4 rounded-md border border-indigo-100">
               <p className="text-sm text-indigo-800 mb-3">Tu imagen será redimensionada a: <strong>{width} X {height}</strong></p>
-              <select onChange={(e) => { const [w, h] = e.target.value.split('x').map(Number); setWidth(w); setHeight(h); }} className="w-full px-3 py-2 text-sm border border-indigo-200 rounded-md focus:ring-indigo-500">
+              <select onChange={(e) => { const [w, h] = e.target.value.split('x').map(Number); setWidth(w); setHeight(h); }} className="w-full px-3 py-2 text-sm border border-indigo-200 rounded-md focus:ring-indigo-500" value={`${width}x${height}`}>
                 <optgroup label="Vertical"><option value="175x260">175 X 260</option><option value="225x334">225 X 334</option><option value="300x445">300 X 445</option></optgroup>
                 <optgroup label="Horizontal"><option value="250x167">250 X 167</option><option value="300x200">300 X 200</option><option value="350x233">350 X 233</option></optgroup>
                 <optgroup label="Cuadrada"><option value="250x250">250 X 250</option><option value="300x300">300 X 300</option><option value="350x350">350 X 350</option></optgroup>
@@ -236,22 +222,27 @@ const GenerarImagenes = () => {
                         viewBox={`0 0 ${videoSize.w} ${videoSize.h}`} 
                         className="absolute inset-0 w-full h-full"
                       >
-                        {POSE_CONNECTIONS.map(([id1, id2], idx) => {
-                          const kp1 = validKeypoints.find((k: any) => k.id === id1);
-                          const kp2 = validKeypoints.find((k: any) => k.id === id2);
+                        {/* LÍNEAS ANATÓMICAS CON COLOR */}
+                        {POSE_CONNECTIONS.map((connection, idx) => {
+                          const kp1 = validKeypoints.find((k: any) => k.id === connection.pair[0]);
+                          const kp2 = validKeypoints.find((k: any) => k.id === connection.pair[1]);
                           if (kp1?.confidence !== undefined && kp1.confidence >= 0 && kp2?.confidence !== undefined && kp2.confidence >= 0) {
-                            return <line key={`bone-${idx}`} x1={kp1.x * scaleX} y1={kp1.y * scaleY} x2={kp2.x * scaleX} y2={kp2.y * scaleY} stroke="#0ea5e9" strokeWidth={Math.max(videoSize.w / 400, 2)} strokeOpacity="0.8" />;
+                            return <line key={`bone-${idx}`} x1={kp1.x * scaleX} y1={kp1.y * scaleY} x2={kp2.x * scaleX} y2={kp2.y * scaleY} stroke={connection.color} strokeWidth={Math.max(videoSize.w / 300, 2)} strokeOpacity="0.85" />;
                           }
                           return null;
                         })}
+
+                        {/* PUNTOS AJUSTADOS PARA LA RESOLUCIÓN DE VIDEO */}
                         {validKeypoints.map((kp: any) => {
                           if (kp.confidence !== undefined && kp.confidence >= 0) {
                             return (
                               <circle 
                                 key={`joint-${kp.id}`} 
                                 cx={kp.x * scaleX} cy={kp.y * scaleY} 
-                                r={Math.max(videoSize.w / 180, 8)} 
-                                fill={selectedKp === kp.id ? "#ef4444" : "#3b82f6"} stroke="#ffffff" strokeWidth={Math.max(videoSize.w / 600, 1.5)} 
+                                r={Math.max(videoSize.w / 250, 3)} 
+                                fill={selectedKp === kp.id ? "#ef4444" : "#0ea5e9"} 
+                                stroke="#ffffff" 
+                                strokeWidth={Math.max(videoSize.w / 500, 1)} 
                                 className="cursor-pointer hover:fill-yellow-400 transition-colors"
                                 onMouseDown={(e) => { e.stopPropagation(); setDraggedKp(kp.id); setSelectedKp(kp.id); }} 
                               />
@@ -259,9 +250,11 @@ const GenerarImagenes = () => {
                           }
                           return null;
                         })}
+
+                        {/* RADAR DEL PUNTO SELECCIONADO */}
                         {selectedKp !== null && validKeypoints.filter((k: any) => k.id === selectedKp).map((kp: any) => (
                           <g key={`radar-${kp.id}`}>
-                            <circle cx={kp.x * scaleX} cy={kp.y * scaleY} r={Math.max(videoSize.w / 40, 15)} className="animate-ping origin-center" fill="none" stroke="#ef4444" strokeWidth={Math.max(videoSize.w / 300, 2)} />
+                            <circle cx={kp.x * scaleX} cy={kp.y * scaleY} r={Math.max(videoSize.w / 40, 15)} className="animate-ping origin-center" fill="none" stroke="#ef4444" strokeWidth={Math.max(videoSize.w / 200, 2)} />
                           </g>
                         ))}
                       </svg>
