@@ -16,7 +16,11 @@ export const useVideoDetection = () => {
   const [analysisResults, setAnalysisResults] = useState<any>(null);
   const [analysisReport, setAnalysisReport] = useState<any>(null);
   const [jsonKeypointsUrl, setJsonKeypointsUrl] = useState<string | null>(null);
+  
+  // VARIABLES DE DATOS JSON
   const [keypointsData, setKeypointsData] = useState<any>(null);
+  const [detailedDetections, setDetailedDetections] = useState<any[]>([]); // <--- AÑADIDO
+  
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [processedStreamUrl, setProcessedStreamUrl] = useState<string | null>(null);
@@ -49,11 +53,18 @@ export const useVideoDetection = () => {
     try {
       const response = await api.get(`/api/analysis/videos/${videoId}/keypoints-json/`);
       
-      if (response && response.keypoints) {
-        setKeypointsData(response.keypoints);
+      if (response) {
+        // Soporta el array directo (versión vieja) y el objeto compuesto (versión nueva)
+        const kps = Array.isArray(response) ? response : (response.keypoints || []);
+        setKeypointsData(kps);
+        
+        // Extraemos las detecciones detalladas
+        const dets = response.detections || [];
+        setDetailedDetections(dets); // <--- AÑADIDO
+        
         setJsonKeypointsUrl(`/api/analysis/videos/${videoId}/keypoints-json/`);
       } else {
-        throw new Error('La respuesta de la API no contiene los keypoints.');
+        throw new Error('La respuesta de la API está vacía o no contiene keypoints.');
       }
     } catch (error) {
       console.warn('Error cargando JSON de keypoints a través de la API:', error);
@@ -71,6 +82,7 @@ export const useVideoDetection = () => {
       setAnalysisReport(null);
       setJsonKeypointsUrl(null);
       setKeypointsData(null);
+      setDetailedDetections([]); // <--- AÑADIDO
       setErrorMessage(null);
       setDownloadUrl(null);
       setProcessedStreamUrl(null);
@@ -170,6 +182,7 @@ export const useVideoDetection = () => {
     setAnalysisReport(null);
     setJsonKeypointsUrl(null);
     setKeypointsData(null);
+    setDetailedDetections([]); // <--- AÑADIDO
     setErrorMessage(null);
     setDownloadUrl(null);
     setProcessedStreamUrl(null);
@@ -197,6 +210,7 @@ export const useVideoDetection = () => {
     analysisReport,
     jsonKeypointsUrl,
     keypointsData,
+    detailedDetections, // <--- AÑADIDO (Esto arregla el error de TypeScript)
     errorMessage,
     fileInputRef,
     handleFileChange,

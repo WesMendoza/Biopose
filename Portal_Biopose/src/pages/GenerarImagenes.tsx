@@ -239,10 +239,10 @@ const GenerarImagenes = () => {
                               <circle 
                                 key={`joint-${kp.id}`} 
                                 cx={kp.x * scaleX} cy={kp.y * scaleY} 
-                                r={Math.max(videoSize.w / 250, 3)} 
+                                r={Math.max(videoSize.w / 1000, 1.5)} 
                                 fill={selectedKp === kp.id ? "#ef4444" : "#0ea5e9"} 
                                 stroke="#ffffff" 
-                                strokeWidth={Math.max(videoSize.w / 500, 1)} 
+                                strokeWidth={Math.max(videoSize.w / 1000, 1)} 
                                 className="cursor-pointer hover:fill-yellow-400 transition-colors"
                                 onMouseDown={(e) => { e.stopPropagation(); setDraggedKp(kp.id); setSelectedKp(kp.id); }} 
                               />
@@ -273,6 +273,14 @@ const GenerarImagenes = () => {
                     <p className="flex justify-between"><span>Sujetos Detectados:</span> <strong className="text-slate-800">1</strong></p>
                     <p className="flex justify-between"><span>Total Fotogramas:</span> <strong className="text-slate-800">{keypointsData.length}</strong></p>
                     <p className="flex justify-between"><span>Fotograma Actual:</span> <strong className="text-slate-800">{currentIndex + 1} de {keypointsData.length}</strong></p>
+                  </div>
+
+                  {/* === NUEVO: MENSAJE INFORMATIVO === */}
+                  <div className="mt-3 p-3 bg-blue-50/80 border border-blue-100 rounded-lg flex items-start shadow-sm">
+                    <Info className="w-4 h-4 text-blue-500 mr-2 shrink-0 mt-0.5" />
+                    <p className="text-xs text-blue-700 leading-relaxed">
+                      <strong>Nota:</strong> El valor de la confianza es generado en el análisis inicial del video y no cambia aunque se modifiquen las coordenadas manualmente.
+                    </p>
                   </div>
                 </div>
 

@@ -204,7 +204,7 @@ const VerificarImagenes = () => {
                         key={`joint-${kp.id}`} cx={p.x} cy={p.y} 
                         r={Math.max(naturalSize.w / 1000, 1.5)} 
                         fill={selectedKp === kp.id ? "#ef4444" : "#0ea5e9"} 
-                        stroke="#ffffff" strokeWidth={Math.max(naturalSize.w / 1200, 0.5)} 
+                        stroke="#ffffff" strokeWidth={Math.max(naturalSize.w / 1000, 1)} 
                         className="cursor-pointer hover:fill-yellow-400 transition-colors"
                         onMouseDown={(e) => { e.stopPropagation(); setDraggedKp(kp.id); setSelectedKp(kp.id); }}
                       />
@@ -235,6 +235,14 @@ const VerificarImagenes = () => {
                   <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-1 text-sm text-slate-600">
                     <p className="flex justify-between"><span>Modelo:</span> <strong className="text-slate-800">{poseResults.model_used || 'N/A'}</strong></p>
                     <p className="flex justify-between"><span>Sujetos:</span> <strong className="text-slate-800">{poseResults.persons_detected || 0}</strong></p>
+                  </div>
+
+                  {/* === NUEVO: MENSAJE INFORMATIVO === */}
+                  <div className="mt-3 p-3 bg-blue-50/80 border border-blue-100 rounded-lg flex items-start shadow-sm">
+                    <Info className="w-4 h-4 text-blue-500 mr-2 shrink-0 mt-0.5" />
+                    <p className="text-xs text-blue-700 leading-relaxed">
+                      <strong>Nota:</strong> El valor de la confianza proviene del análisis inicial de la IA y no cambia aunque se modifiquen las coordenadas manualmente.
+                    </p>
                   </div>
                 </div>
 

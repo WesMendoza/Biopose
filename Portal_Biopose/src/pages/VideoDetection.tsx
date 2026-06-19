@@ -2,6 +2,13 @@ import { AlertTriangle, CheckCircle, CloudUpload, Download, Loader, RefreshCw } 
 import { useEffect, useRef } from 'react';
 import { useVideoDetection } from '../hooks/useVideoDetection';
 
+// DICCIONARIO EXCLUSIVO PARA COMPORTAMIENTOS SOSPECHOSOS
+const BEHAVIOR_LABELS: Record<string, { label: string, color: string }> = {
+  'excessive_gaze': { label: 'Mirada excesiva', color: 'bg-orange-100 text-orange-700 border-orange-200' },
+  'hidden_hands': { label: 'Manos ocultas detrás', color: 'bg-red-100 text-red-700 border-red-200' },
+  'hand_under_clothes': { label: 'Mano bajo ropa', color: 'bg-purple-100 text-purple-700 border-purple-200' },
+};
+
 const VideoDetection = () => {
   const {
     file,
@@ -19,6 +26,7 @@ const VideoDetection = () => {
     analysisResults,
     analysisReport,
     keypointsData,
+    detailedDetections, // <--- AÑADIDO: Importamos la lista de detecciones del hook
     errorMessage,
     downloadUrl,
     fileInputRef,
@@ -60,23 +68,23 @@ const VideoDetection = () => {
     const canvas = canvasRef.current;
     if (!video || !canvas || !keypointsData) return;
 
-    // Alinea el canvas al tamaño visual del video en la pantalla
-    const rect = video.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-    canvas.style.width = `${rect.width}px`;
-    canvas.style.height = `${rect.height}px`;
+    // Sincronizar el tamaño interno del Canvas con la resolución intrínseca del video
+    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+    }
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
+    
     // Limpia el dibujo anterior
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (!video.videoWidth || !video.videoHeight) return;
 
-    // Escala para mapear las coordenadas originales a la resolución actual de la pantalla
-    const scaleX = canvas.width / video.videoWidth;
-    const scaleY = canvas.height / video.videoHeight;
+    // Los puntos del backend siempre vienen de un frame resizado a 640x640
+    // Necesitamos escalarlos a la resolución original del video
+    const scaleX = video.videoWidth / 640;
+    const scaleY = video.videoHeight / 640;
 
     const currentDetections = getClosestDetections();
 
@@ -94,7 +102,8 @@ const VideoDetection = () => {
 
       // Dibujar líneas del esqueleto
       ctx.strokeStyle = 'rgba(16, 185, 129, 0.8)'; // Verde esmeralda
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = Math.max(video.videoWidth / 300, 2); // Grosor dinámico
+
       skeletonConnections.forEach(([p1, p2]) => {
         const pt1 = points.find((p: any) => p.id === p1);
         const pt2 = points.find((p: any) => p.id === p2);
@@ -111,15 +120,12 @@ const VideoDetection = () => {
       // Dibujar las articulaciones (puntos rojos)
       points.forEach((point: any) => {
         if (point.confidence > 0.4) {
-          const x = point.x * scaleX;
-          const y = point.y * scaleY;
-
           ctx.beginPath();
-          ctx.arc(x, y, 4, 0, 2 * Math.PI);
+          ctx.arc(point.x * scaleX, point.y * scaleY, Math.max(video.videoWidth / 250, 3), 0, 2 * Math.PI);
           ctx.fillStyle = 'rgba(239, 68, 68, 1)';
           ctx.fill();
           ctx.strokeStyle = 'white';
-          ctx.lineWidth = 1.5;
+          ctx.lineWidth = Math.max(video.videoWidth / 500, 1);
           ctx.stroke();
         }
       });
@@ -142,9 +148,13 @@ const VideoDetection = () => {
   const totalFrames = analysisResults?.total_frames ?? analysisReport?.totalFrames;
   const durationSeconds = analysisResults?.duration_seconds ?? analysisReport?.totalDuracionSegundos;
   const processingSeconds = analysisResults?.processing_time_seconds ?? analysisReport?.tiempoProcesamientoSegundos;
-  const totalDetections = analysisResults?.analysis_report?.total_detections ?? analysisReport?.totalEventos;
   const averageConfidence = analysisResults?.analysis_report?.average_confidence ?? analysisReport?.confianzaPromedio;
-  const detectionsByType = analysisResults?.analysis_report?.detections_by_type ?? analysisReport?.estadisticas?.detections_by_type;
+
+  // FILTRO: Solo nos interesan los comportamientos sospechosos en esta pantalla
+  const allowedBehaviors = ['excessive_gaze', 'hidden_hands', 'hand_under_clothes'];
+  const filteredDetections = (detailedDetections || []).filter((det: any) => 
+    allowedBehaviors.includes(det.tipo_evento)
+  );
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -189,14 +199,16 @@ const VideoDetection = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Dimensión</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1" title="Cambia el motor de Inteligencia Artificial">
+                Dimensión (Motor IA)
+              </label>
               <select
                 value={poseMode}
                 onChange={(e) => setPoseMode(e.target.value as '2D' | '3D')}
                 className="w-full px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="2D">2D</option>
-                <option value="3D">3D</option>
+                <option value="2D">2D (YOLOv8 - Multitudes)</option>
+                <option value="3D">3D (MediaPipe - 1 Persona)</option>
               </select>
             </div>
 
@@ -317,7 +329,7 @@ const VideoDetection = () => {
           </div>
           <hr className="mb-4 border-gray-200" />
           
-          <div className="grow bg-gray-900 rounded-md overflow-hidden min-h-[18.75rem] relative">
+          <div className="grow bg-gray-900 rounded-md overflow-hidden min-h-[18.75rem] relative flex items-center justify-center">
             {videoUrl ? (
               <>
                 <video
@@ -326,11 +338,11 @@ const VideoDetection = () => {
                   controls
                   onTimeUpdate={drawOverlay}
                   onLoadedMetadata={drawOverlay}
-                  className="w-full h-full object-contain bg-black"
+                  className="absolute inset-0 w-full h-full object-contain bg-black"
                 />
                 <canvas
                   ref={canvasRef}
-                  className="absolute inset-0 pointer-events-none"
+                  className="absolute inset-0 w-full h-full object-contain pointer-events-none"
                 />
               </>
             ) : isProcessing ? (
@@ -345,7 +357,7 @@ const VideoDetection = () => {
             )}
 
             {isProcessing && videoUrl && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+              <div className="absolute inset-0 flex items-center justify-center bg-black/30 z-10">
                 <div className="text-center text-white">
                   <Loader className="w-10 h-10 mx-auto animate-spin mb-3" />
                   <p className="text-sm">Procesando {progress}%...</p>
@@ -372,17 +384,54 @@ const VideoDetection = () => {
                 <li><strong>Frames totales:</strong> {totalFrames ?? 'N/A'}</li>
                 <li><strong>Duración (s):</strong> {durationSeconds ?? 'N/A'}</li>
                 <li><strong>Tiempo de proceso (s):</strong> {processingSeconds ?? 'N/A'}</li>
-                <li><strong>Detecciones totales:</strong> {totalDetections ?? 'N/A'}</li>
+                <li><strong>Actitudes sospechosas detectadas:</strong> {filteredDetections.length}</li>
                 <li><strong>Confianza promedio:</strong> {averageConfidence ?? 'N/A'}</li>
               </ul>
             </div>
-            <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
-              <p className="text-sm text-gray-600 mb-2">Desglose de detecciones</p>
-              {detectionsByType ? (
-                <pre className="whitespace-pre-wrap text-xs font-mono text-gray-700 bg-white rounded p-3 overflow-x-auto">{JSON.stringify(detectionsByType, null, 2)}</pre>
-              ) : (
-                <p className="text-sm text-gray-500">No hay desgloses disponibles.</p>
-              )}
+            
+            {/* PANEL DERECHO: Lista interactiva de detecciones */}
+            <div className="bg-gray-50 p-4 rounded-md border border-gray-200 flex flex-col h-full max-h-[300px]">
+              <p className="text-sm font-bold text-gray-700 mb-2">Actitudes Detectadas (Clic para saltar)</p>
+              
+              <div className="overflow-y-auto flex-1 pr-2 space-y-2 custom-scrollbar">
+                {filteredDetections.length > 0 ? (
+                  filteredDetections.map((det: any, index: number) => {
+                    
+                    const mins = Math.floor(det.segundo_inicio / 60).toString().padStart(2, '0');
+                    const secs = Math.floor(det.segundo_inicio % 60).toString().padStart(2, '0');
+                    const style = BEHAVIOR_LABELS[det.tipo_evento] || { label: det.tipo_evento, color: 'bg-gray-200 text-gray-700 border-gray-300' };
+
+                    return (
+                      <button 
+                        key={index}
+                        onClick={() => {
+                          if (videoRef.current) {
+                            videoRef.current.currentTime = det.segundo_inicio;
+                            videoRef.current.play();
+                          }
+                        }}
+                        className="w-full text-left bg-white p-3 rounded-lg border border-gray-200 shadow-sm hover:border-indigo-400 hover:shadow transition-all flex items-center justify-between group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
+                            {mins}:{secs}
+                          </span>
+                          <span className={`text-xs font-bold px-2 py-1 rounded border ${style.color}`}>
+                            {style.label}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-400 font-medium group-hover:text-indigo-500">
+                          {(det.confianza * 100).toFixed(0)}% <span className="hidden sm:inline">confianza</span>
+                        </div>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="h-full flex items-center justify-center text-sm text-gray-500 italic text-center px-4">
+                    No se detectaron miradas excesivas ni manos ocultas.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         ) : (
@@ -391,11 +440,14 @@ const VideoDetection = () => {
           </div>
         )}
 
+        {/* JSON de depuración oculto en un "details" para no ensuciar la UI */}
         {(analysisResults || analysisReport) && (
-          <div className="mt-6 bg-gray-100 p-4 rounded-md border border-gray-200 text-xs text-gray-700 overflow-auto">
-            <p className="font-semibold mb-2">JSON completo de respuesta:</p>
-            <pre className="whitespace-pre-wrap">{JSON.stringify(analysisResults || analysisReport, null, 2)}</pre>
-          </div>
+          <details className="mt-6 bg-gray-50 rounded-md border border-gray-200 text-xs text-gray-700">
+            <summary className="p-3 font-semibold cursor-pointer hover:bg-gray-100">Ver JSON completo (Debug)</summary>
+            <div className="p-4 border-t border-gray-200 overflow-auto max-h-64">
+              <pre className="whitespace-pre-wrap">{JSON.stringify(analysisResults || analysisReport, null, 2)}</pre>
+            </div>
+          </details>
         )}
       </div>
     </div>

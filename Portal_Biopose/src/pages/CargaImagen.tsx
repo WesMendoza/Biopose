@@ -253,6 +253,14 @@ const CargaImagen = () => {
                     <p className="flex justify-between"><span>Sujetos Detectados:</span> <strong className="text-slate-800">{poseResults?.persons_detected || 0}</strong></p>
                     <p className="flex justify-between"><span>Resolución:</span> <strong className="text-slate-800">{width} x {height}</strong></p>
                   </div>
+                  
+                  {/* === NUEVO: MENSAJE INFORMATIVO === */}
+                  <div className="mt-3 p-3 bg-blue-50/80 border border-blue-100 rounded-lg flex items-start shadow-sm">
+                    <Info className="w-4 h-4 text-blue-500 mr-2 shrink-0 mt-0.5" />
+                    <p className="text-xs text-blue-700 leading-relaxed">
+                      <strong>Nota:</strong> El valor de la confianza es generado en el análisis inicial de la IA y no cambia aunque se modifiquen las coordenadas manualmente.
+                    </p>
+                  </div>
                 </div>
 
                 {poseResults?.persons && poseResults.persons.length > 0 && (
