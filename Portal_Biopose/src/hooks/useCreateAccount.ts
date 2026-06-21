@@ -2,12 +2,76 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 
+// ==========================================================
+// ALGORITMOS DE VALIDACIÓN ECUATORIANA
+// ==========================================================
+const validarCedula = (cedula: string): boolean => {
+  if (cedula.length !== 10) return false;
+  
+  const prov = parseInt(cedula.substring(0, 2), 10);
+  if ((prov < 1 || prov > 24) && prov !== 30) return false; // 30 es para ecuatorianos en el exterior
+
+  const tercerDigito = parseInt(cedula[2], 10);
+  if (tercerDigito >= 6) return false; // El tercer dígito para personas naturales es menor a 6
+
+  const coeficientes = [2, 1, 2, 1, 2, 1, 2, 1, 2];
+  let suma = 0;
+  for (let i = 0; i < 9; i++) {
+    let valor = parseInt(cedula[i], 10) * coeficientes[i];
+    if (valor > 9) valor -= 9;
+    suma += valor;
+  }
+
+  const digitoVerificador = parseInt(cedula[9], 10);
+  let decenaSuperior = Math.ceil(suma / 10) * 10;
+  let resultado = decenaSuperior - suma;
+  if (resultado === 10) resultado = 0;
+
+  return resultado === digitoVerificador;
+};
+
+const validarRuc = (ruc: string): boolean => {
+  if (ruc.length !== 13) return false;
+  if (parseInt(ruc.substring(10, 13), 10) < 1) return false; // Debe terminar en algo mayor a 000 (usualmente 001)
+
+  const prov = parseInt(ruc.substring(0, 2), 10);
+  if ((prov < 1 || prov > 24) && prov !== 30) return false;
+
+  const tercerDigito = parseInt(ruc[2], 10);
+
+  if (tercerDigito < 6) {
+    // Persona Natural: Los primeros 10 dígitos son la cédula
+    return validarCedula(ruc.substring(0, 10));
+  } 
+  else if (tercerDigito === 6) {
+    // Entidad Pública: Módulo 11 (coeficientes específicos)
+    const coeficientes = [3, 2, 7, 6, 5, 4, 3, 2];
+    let suma = 0;
+    for (let i = 0; i < 8; i++) suma += parseInt(ruc[i], 10) * coeficientes[i];
+    const digitoVerificador = parseInt(ruc[8], 10);
+    const residuo = suma % 11;
+    let resultado = residuo === 0 ? 0 : 11 - residuo;
+    return resultado === digitoVerificador;
+  } 
+  else if (tercerDigito === 9) {
+    // Sociedad Privada: Módulo 11 (coeficientes específicos)
+    const coeficientes = [4, 3, 2, 7, 6, 5, 4, 3, 2];
+    let suma = 0;
+    for (let i = 0; i < 9; i++) suma += parseInt(ruc[i], 10) * coeficientes[i];
+    const digitoVerificador = parseInt(ruc[9], 10);
+    const residuo = suma % 11;
+    let resultado = residuo === 0 ? 0 : 11 - residuo;
+    return resultado === digitoVerificador;
+  }
+
+  return false;
+};
+
 export const useCreateAccount = () => {
   const navigate = useNavigate();
   const [empresas, setEmpresas] = useState<any[]>([]);
-
-  // Estado para controlar si el usuario quiere unirse o crear una empresa
   const [isCrearEmpresa, setIsCrearEmpresa] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   const [formData, setFormData] = useState({
     identificacion: '',
@@ -21,8 +85,6 @@ export const useCreateAccount = () => {
     rucEmpresa: '',
   });
 
-  const [isSuccess, setIsSuccess] = useState(false);
-
   useEffect(() => {
     api.get('/api/auth/empresas-publicas/')
       .then((res: any) => {
@@ -33,20 +95,59 @@ export const useCreateAccount = () => {
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    let finalValue = value;
+
+    // BLOQUEO: Evitar que escriban letras en campos estrictamente numéricos
+    if (['identificacion', 'celular', 'rucEmpresa'].includes(name)) {
+      finalValue = value.replace(/\D/g, ''); // \D significa "todo lo que no sea dígito"
+      
+      // Limitar longitudes máximas
+      if (name === 'identificacion' && finalValue.length > 10) finalValue = finalValue.slice(0, 10);
+      if (name === 'celular' && finalValue.length > 10) finalValue = finalValue.slice(0, 10);
+      if (name === 'rucEmpresa' && finalValue.length > 13) finalValue = finalValue.slice(0, 13);
+    }
+
+    setFormData({ ...formData, [name]: finalValue });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validaciones extra dependiendo del modo elegido
-    if (isCrearEmpresa && (!formData.nombreEmpresa || !formData.rucEmpresa)) {
-      alert("Por favor ingrese el nombre y RUC de su nueva empresa.");
+    // 1. Validar Correo Electrónico
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.correo)) {
+      alert("Por favor ingrese un correo electrónico válido.");
       return;
     }
-    if (!isCrearEmpresa && !formData.codigoEmpresa) {
-      alert("Por favor seleccione una empresa para unirse.");
+
+    // 2. Validar Cédula Ecuatoriana
+    if (!validarCedula(formData.identificacion)) {
+      alert("La cédula ingresada no es válida. Revise los números ingresados.");
       return;
+    }
+
+    // 3. Validar Celular (10 dígitos, empieza con 09)
+    if (formData.celular.length !== 10 || !formData.celular.startsWith('09')) {
+      alert("El número de celular debe tener 10 dígitos y empezar con '09'.");
+      return;
+    }
+
+    // 4. Validar Empresa / RUC
+    if (isCrearEmpresa) {
+      if (!formData.nombreEmpresa || !formData.rucEmpresa) {
+        alert("Por favor ingrese el nombre y RUC de su nueva empresa.");
+        return;
+      }
+      if (!validarRuc(formData.rucEmpresa)) {
+        alert("El RUC ingresado no es válido según los estándares ecuatorianos (Natural, Pública o Privada).");
+        return;
+      }
+    } else {
+      if (!formData.codigoEmpresa) {
+        alert("Por favor seleccione una empresa para unirse.");
+        return;
+      }
     }
 
     const payload = {
@@ -55,14 +156,14 @@ export const useCreateAccount = () => {
       cedula: formData.identificacion,
       correo: formData.correo,
       password: formData.password,
-      isCrearEmpresa: isCrearEmpresa,           // Flag (bandera) para el backend
-      codigoEmpresa: formData.codigoEmpresa,    // Solo viaja si se une
-      nombreEmpresa: formData.nombreEmpresa,    // Solo viaja si crea
-      rucEmpresa: formData.rucEmpresa           // Solo viaja si crea
+      isCrearEmpresa: isCrearEmpresa,           
+      codigoEmpresa: formData.codigoEmpresa,    
+      nombreEmpresa: formData.nombreEmpresa,    
+      rucEmpresa: formData.rucEmpresa           
     };
 
     api.post('/api/auth/registerAccount/', payload)
-      .then((res) => {
+      .then(() => {
         setIsSuccess(true);
         setTimeout(() => navigate('/login'), 1500);
       })
@@ -72,12 +173,6 @@ export const useCreateAccount = () => {
   };
 
   return {
-    formData,
-    empresas,
-    isSuccess,
-    isCrearEmpresa, 
-    setIsCrearEmpresa, // Exponemos esto para los botones
-    handleChange,
-    handleSubmit
+    formData, empresas, isSuccess, isCrearEmpresa, setIsCrearEmpresa, handleChange, handleSubmit
   };
 };

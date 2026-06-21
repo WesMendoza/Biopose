@@ -99,7 +99,6 @@ const GenerarImagenes = () => {
               ptToUpdate.x = svgP.x / scaleX;
               ptToUpdate.y = svgP.y / scaleY;
           }
-          // Confianza al 100% por corrección humana
           ptToUpdate.confidence = 1.0; 
         }
 
@@ -188,7 +187,7 @@ const GenerarImagenes = () => {
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-[1400px] flex flex-col h-[95vh] overflow-hidden">
             <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-slate-50 rounded-t-xl shrink-0">
               <h5 className="text-xl font-bold text-slate-800 flex items-center">Análisis Biométrico (Video) <span className="ml-4 text-xs font-normal bg-blue-100 text-blue-700 px-2 py-1 rounded">Puedes arrastrar los puntos para corregirlos</span></h5>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-700 transition-colors bg-white border border-slate-200 p-1.5 rounded-lg shadow-sm"><X className="w-5 h-5" /></button>
+              <button onClick={handleReuploadClick} className="text-slate-400 hover:text-slate-700 transition-colors bg-white border border-slate-200 p-1.5 rounded-lg shadow-sm"><X className="w-5 h-5" /></button>
             </div>
             
             <div className="flex-grow flex flex-col lg:flex-row overflow-hidden">
@@ -222,7 +221,6 @@ const GenerarImagenes = () => {
                         viewBox={`0 0 ${videoSize.w} ${videoSize.h}`} 
                         className="absolute inset-0 w-full h-full"
                       >
-                        {/* LÍNEAS ANATÓMICAS CON COLOR */}
                         {POSE_CONNECTIONS.map((connection, idx) => {
                           const kp1 = validKeypoints.find((k: any) => k.id === connection.pair[0]);
                           const kp2 = validKeypoints.find((k: any) => k.id === connection.pair[1]);
@@ -232,7 +230,6 @@ const GenerarImagenes = () => {
                           return null;
                         })}
 
-                        {/* PUNTOS AJUSTADOS PARA LA RESOLUCIÓN DE VIDEO */}
                         {validKeypoints.map((kp: any) => {
                           if (kp.confidence !== undefined && kp.confidence >= 0) {
                             return (
@@ -251,7 +248,6 @@ const GenerarImagenes = () => {
                           return null;
                         })}
 
-                        {/* RADAR DEL PUNTO SELECCIONADO */}
                         {selectedKp !== null && validKeypoints.filter((k: any) => k.id === selectedKp).map((kp: any) => (
                           <g key={`radar-${kp.id}`}>
                             <circle cx={kp.x * scaleX} cy={kp.y * scaleY} r={Math.max(videoSize.w / 40, 15)} className="animate-ping origin-center" fill="none" stroke="#ef4444" strokeWidth={Math.max(videoSize.w / 200, 2)} />
@@ -275,7 +271,6 @@ const GenerarImagenes = () => {
                     <p className="flex justify-between"><span>Fotograma Actual:</span> <strong className="text-slate-800">{currentIndex + 1} de {keypointsData.length}</strong></p>
                   </div>
 
-                  {/* === NUEVO: MENSAJE INFORMATIVO === */}
                   <div className="mt-3 p-3 bg-blue-50/80 border border-blue-100 rounded-lg flex items-start shadow-sm">
                     <Info className="w-4 h-4 text-blue-500 mr-2 shrink-0 mt-0.5" />
                     <p className="text-xs text-blue-700 leading-relaxed">
@@ -312,7 +307,7 @@ const GenerarImagenes = () => {
                   ) : (<div className="bg-red-50 p-4 rounded-xl border border-red-200 text-sm text-red-700 flex items-start shadow-sm"><AlertCircle className="w-5 h-5 mr-3 shrink-0 mt-0.5" /><p>No hay articulaciones visibles.</p></div>)}
 
                   <div className="flex flex-col sm:flex-row gap-3 mt-6 pt-5 border-t border-slate-200 shrink-0">
-                    <button className="flex-1 py-3 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-xl font-bold transition-colors text-sm shadow-sm" onClick={() => setIsModalOpen(false)}>Descartar y Cerrar</button>
+                    <button className="flex-1 py-3 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-xl font-bold transition-colors text-sm shadow-sm" onClick={handleReuploadClick}>Descartar y Cerrar</button>
                     <button className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-md shadow-indigo-200 hover:shadow-lg text-sm flex justify-center items-center" onClick={handleSaveResults}>
                       <Download className="w-4 h-4 mr-2" /> Descargar Fotogramas (ZIP)
                     </button>

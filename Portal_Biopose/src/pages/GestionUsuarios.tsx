@@ -8,8 +8,10 @@ const GestionUsuarios = () => {
     isEditModalOpen,
     isDeleteModalOpen,
     isCreateModalOpen,
-    selectedUser, setSelectedUser,
-    newUser, setNewUser,
+    selectedUser,
+    newUser,
+    updateNewUserField,
+    updateEditUserField,
     handleEditClick,
     handleDeleteClick,
     handleCreateClick,
@@ -109,10 +111,11 @@ const GestionUsuarios = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700">Identificación (Cédula)</label>
                 <input
-                  type="text"
+                  type="tel"
                   value={newUser.identificacion}
-                  onChange={(e) => setNewUser({ ...newUser, identificacion: e.target.value })}
-                  className="mt-1 w-full p-2 border rounded-md"
+                  onChange={(e) => updateNewUserField('identificacion', e.target.value)}
+                  placeholder="10 dígitos numéricos"
+                  className="mt-1 w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
 
@@ -121,7 +124,8 @@ const GestionUsuarios = () => {
                 <input
                   type="text"
                   value={newUser.fullName}
-                  onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })}
+                  onChange={(e) => updateNewUserField('fullName', e.target.value)}
+                  placeholder="Ej: Juan Pérez"
                   className="mt-1 w-full p-2 border rounded-md"
                 />
               </div>
@@ -131,7 +135,8 @@ const GestionUsuarios = () => {
                 <input
                   type="email"
                   value={newUser.email}
-                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                  onChange={(e) => updateNewUserField('email', e.target.value)}
+                  placeholder="juan@ejemplo.com"
                   className="mt-1 w-full p-2 border rounded-md"
                 />
               </div>
@@ -141,7 +146,7 @@ const GestionUsuarios = () => {
                 <input
                   type="password"
                   value={newUser.password}
-                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                  onChange={(e) => updateNewUserField('password', e.target.value)}
                   className="mt-1 w-full p-2 border rounded-md"
                 />
               </div>
@@ -150,7 +155,7 @@ const GestionUsuarios = () => {
                 <label className="block text-sm font-medium text-gray-700">Rol</label>
                 <select
                   value={newUser.idRol}
-                  onChange={(e) => setNewUser({ ...newUser, idRol: e.target.value })}
+                  onChange={(e) => updateNewUserField('idRol', e.target.value)}
                   className="mt-1 w-full p-2 border rounded-md"
                 >
                   <option value="">Seleccione un rol</option>
@@ -196,15 +201,13 @@ const GestionUsuarios = () => {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Identificación</label>
+                <label className="block text-sm font-medium text-gray-700">Identificación (Cédula)</label>
                 <input
-                  type="text"
+                  type="tel"
                   value={selectedUser.identification}
-                  onChange={(e) =>
-                    setSelectedUser({ ...selectedUser, identification: e.target.value })
-                  }
+                  onChange={(e) => updateEditUserField('identification', e.target.value)}
                   className="mt-1 w-full p-2 border rounded-md"
-                  disabled // Usualmente la cédula no se edita, pero puedes quitar esto si tu backend lo permite
+                  disabled // Mantengo el disabled por si tu API prohíbe editar cédulas, pero la protección ya existe
                 />
               </div>
 
@@ -213,9 +216,7 @@ const GestionUsuarios = () => {
                 <input
                   type="text"
                   value={selectedUser.fullName}
-                  onChange={(e) =>
-                    setSelectedUser({ ...selectedUser, fullName: e.target.value })
-                  }
+                  onChange={(e) => updateEditUserField('fullName', e.target.value)}
                   className="mt-1 w-full p-2 border rounded-md"
                 />
               </div>
@@ -225,9 +226,7 @@ const GestionUsuarios = () => {
                 <input
                   type="email"
                   value={selectedUser.email}
-                  onChange={(e) =>
-                    setSelectedUser({ ...selectedUser, email: e.target.value })
-                  }
+                  onChange={(e) => updateEditUserField('email', e.target.value)}
                   className="mt-1 w-full p-2 border rounded-md"
                 />
               </div>
@@ -237,13 +236,10 @@ const GestionUsuarios = () => {
                   <label className="block text-sm font-medium text-gray-700">Rol</label>
                   <select
                     value={selectedUser.idRol ?? ''}
-                    onChange={(e) =>
-                      setSelectedUser({
-                        ...selectedUser,
-                        idRol: e.target.value,
-                        role: e.target.options[e.target.selectedIndex].text
-                      })
-                    }
+                    onChange={(e) => {
+                      updateEditUserField('idRol', e.target.value);
+                      updateEditUserField('role', e.target.options[e.target.selectedIndex].text);
+                    }}
                     className="mt-1 w-full p-2 border rounded-md"
                   >
                     <option value="">Seleccione un rol</option>
@@ -260,9 +256,7 @@ const GestionUsuarios = () => {
                     <input
                       type="checkbox"
                       checked={selectedUser.isActive}
-                      onChange={(e) =>
-                        setSelectedUser({ ...selectedUser, isActive: e.target.checked })
-                      }
+                      onChange={(e) => updateEditUserField('isActive', e.target.checked)}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
                   </div>

@@ -4,13 +4,7 @@ import { useCreateAccount } from '../hooks/useCreateAccount';
 
 const CreateAccount = () => {
   const {
-    formData,
-    empresas,
-    isSuccess,
-    isCrearEmpresa,
-    setIsCrearEmpresa,
-    handleChange,
-    handleSubmit
+    formData, empresas, isSuccess, isCrearEmpresa, setIsCrearEmpresa, handleChange, handleSubmit
   } = useCreateAccount();
 
   return (
@@ -68,7 +62,7 @@ const CreateAccount = () => {
                 
                 {/* Inputs de texto estándar */}
                 {[
-                  { label: "Identificación", name: "identificacion", icon: User, type: "text", placeholder: "Ej: 0102030405" },
+                  { label: "Identificación (Cédula)", name: "identificacion", icon: User, type: "tel", placeholder: "10 dígitos" },
                   { label: "Nombres Completos", name: "nombres", icon: User, type: "text", placeholder: "Ej: Juan" },
                   { label: "Apellidos Completos", name: "apellidos", icon: User, type: "text", placeholder: "Ej: Pérez" },
                   { label: "Correo Electrónico", name: "correo", icon: Mail, type: "email", placeholder: "juan@ejemplo.com" },
@@ -160,12 +154,12 @@ const CreateAccount = () => {
                       <div className="relative">
                         <FileText className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                         <input
-                          type="text"
+                          type="tel"
                           name="rucEmpresa"
                           value={formData.rucEmpresa}
                           onChange={handleChange}
                           required={isCrearEmpresa}
-                          placeholder="Ej: 0991234567001"
+                          placeholder="13 dígitos"
                           className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-transparent bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#0ea5e9] focus:ring-2 focus:ring-[#0ea5e9]/20 transition-all text-[13px]"
                         />
                       </div>

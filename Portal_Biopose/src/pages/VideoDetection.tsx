@@ -4,9 +4,15 @@ import { useVideoDetection } from '../hooks/useVideoDetection';
 
 // DICCIONARIO EXCLUSIVO PARA COMPORTAMIENTOS SOSPECHOSOS
 const BEHAVIOR_LABELS: Record<string, { label: string, color: string }> = {
+  // Nombres en inglés (por si acaso el backend los manda crudos)
   'excessive_gaze': { label: 'Mirada excesiva', color: 'bg-orange-100 text-orange-700 border-orange-200' },
   'hidden_hands': { label: 'Manos ocultas detrás', color: 'bg-red-100 text-red-700 border-red-200' },
   'hand_under_clothes': { label: 'Mano bajo ropa', color: 'bg-purple-100 text-purple-700 border-purple-200' },
+  
+  // Nombres en español (que el backend está enviando en el JSON crudo)
+  'Mirada Excesiva': { label: 'Mirada excesiva', color: 'bg-orange-100 text-orange-700 border-orange-200' },
+  'Manos ocultas detrás': { label: 'Manos ocultas', color: 'bg-red-100 text-red-700 border-red-200' },
+  'Mano en el bolsillo o bajo ropa': { label: 'Mano bajo ropa', color: 'bg-purple-100 text-purple-700 border-purple-200' },
 };
 
 const VideoDetection = () => {
@@ -26,7 +32,7 @@ const VideoDetection = () => {
     analysisResults,
     analysisReport,
     keypointsData,
-    detailedDetections, // <--- AÑADIDO: Importamos la lista de detecciones del hook
+    detailedDetections,
     errorMessage,
     downloadUrl,
     fileInputRef,
@@ -38,9 +44,14 @@ const VideoDetection = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // 1. Obtiene las detecciones exactas para el segundo actual del video
+// 1. Obtiene las detecciones exactas para el segundo actual del video
   const getClosestDetections = () => {
-    if (!keypointsData || !videoRef.current) return [];
+    if (!videoRef.current) return [];
+
+    // BLINDAJE: Si keypointsData es nulo, indefinido, o no es un arreglo, regresamos vacío
+    if (!keypointsData || !Array.isArray(keypointsData)) {
+      return [];
+    }
 
     const currentTime = videoRef.current.currentTime;
     let minDiff = Infinity;
@@ -48,10 +59,12 @@ const VideoDetection = () => {
 
     // Buscar el timestamp_sec del JSON que más se acerque al tiempo actual del video
     for (const frame of keypointsData) {
-      const diff = Math.abs(frame.timestamp_sec - currentTime);
-      if (diff < minDiff) {
-        minDiff = diff;
-        closestTime = frame.timestamp_sec;
+      if (frame && frame.timestamp_sec !== undefined) {
+        const diff = Math.abs(frame.timestamp_sec - currentTime);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestTime = frame.timestamp_sec;
+        }
       }
     }
 
@@ -68,7 +81,6 @@ const VideoDetection = () => {
     const canvas = canvasRef.current;
     if (!video || !canvas || !keypointsData) return;
 
-    // Sincronizar el tamaño interno del Canvas con la resolución intrínseca del video
     if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -77,12 +89,9 @@ const VideoDetection = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    // Limpia el dibujo anterior
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (!video.videoWidth || !video.videoHeight) return;
 
-    // Los puntos del backend siempre vienen de un frame resizado a 640x640
-    // Necesitamos escalarlos a la resolución original del video
     const scaleX = video.videoWidth / 640;
     const scaleY = video.videoHeight / 640;
 
@@ -92,23 +101,20 @@ const VideoDetection = () => {
       const points = person.keypoints_json;
       if (!points) return;
 
-      // Conexiones anatómicas del formato COCO (YOLO)
       const skeletonConnections = [
-        [5, 7], [7, 9], [6, 8], [8, 10], // Brazos
-        [11, 13], [13, 15], [12, 14], [14, 16], // Piernas
-        [5, 6], [11, 12], [5, 11], [6, 12], // Torso central
-        [0, 1], [0, 2], [1, 3], [2, 4] // Rostro
+        [5, 7], [7, 9], [6, 8], [8, 10], 
+        [11, 13], [13, 15], [12, 14], [14, 16], 
+        [5, 6], [11, 12], [5, 11], [6, 12], 
+        [0, 1], [0, 2], [1, 3], [2, 4] 
       ];
 
-      // Dibujar líneas del esqueleto
-      ctx.strokeStyle = 'rgba(16, 185, 129, 0.8)'; // Verde esmeralda
-      ctx.lineWidth = Math.max(video.videoWidth / 300, 2); // Grosor dinámico
+      ctx.strokeStyle = 'rgba(16, 185, 129, 0.8)'; 
+      ctx.lineWidth = Math.max(video.videoWidth / 300, 2); 
 
       skeletonConnections.forEach(([p1, p2]) => {
         const pt1 = points.find((p: any) => p.id === p1);
         const pt2 = points.find((p: any) => p.id === p2);
         
-        // Dibuja la línea solo si ambos puntos tienen buena confianza
         if (pt1 && pt2 && pt1.confidence > 0.4 && pt2.confidence > 0.4) {
           ctx.beginPath();
           ctx.moveTo(pt1.x * scaleX, pt1.y * scaleY);
@@ -117,7 +123,6 @@ const VideoDetection = () => {
         }
       });
 
-      // Dibujar las articulaciones (puntos rojos)
       points.forEach((point: any) => {
         if (point.confidence > 0.4) {
           ctx.beginPath();
@@ -150,9 +155,13 @@ const VideoDetection = () => {
   const processingSeconds = analysisResults?.processing_time_seconds ?? analysisReport?.tiempoProcesamientoSegundos;
   const averageConfidence = analysisResults?.analysis_report?.average_confidence ?? analysisReport?.confianzaPromedio;
 
-  // FILTRO: Solo nos interesan los comportamientos sospechosos en esta pantalla
-  const allowedBehaviors = ['excessive_gaze', 'hidden_hands', 'hand_under_clothes'];
-  const filteredDetections = (detailedDetections || []).filter((det: any) => 
+  // FILTRO: Validamos ambos idiomas
+  const allowedBehaviors = [
+    'excessive_gaze', 'hidden_hands', 'hand_under_clothes',
+    'Mirada Excesiva', 'Manos ocultas detrás', 'Mano en el bolsillo o bajo ropa'
+  ];
+  
+  const filteredDetections = (detailedDetections || []).filter((det: any) =>
     allowedBehaviors.includes(det.tipo_evento)
   );
 
@@ -160,7 +169,6 @@ const VideoDetection = () => {
     <div className="p-8 max-w-7xl mx-auto">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Detección de Comportamientos Sospechosos</h1>
 
-      {/* Control Panel */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-8 border border-gray-100">
         <h4 className="text-lg font-semibold text-gray-700 mb-2">Cargar Video para Análisis</h4>
         <p className="text-gray-500 mb-6 text-sm">El sistema analizará el video en busca de comportamientos sospechosos.</p>
@@ -283,9 +291,7 @@ const VideoDetection = () => {
         </div>
       </div>
 
-      {/* Video Preview Displays */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Loaded Video */}
         <div className="bg-white rounded-lg shadow-md p-4 border border-gray-100 flex flex-col">
           <h4 className="text-lg font-semibold text-gray-700 flex items-center mb-3">
             <CloudUpload className="w-5 h-5 mr-2 text-indigo-500" />
@@ -309,7 +315,6 @@ const VideoDetection = () => {
           </div>
         </div>
 
-        {/* Processed Video */}
         <div className="bg-white rounded-lg shadow-md p-4 border border-gray-100 flex flex-col">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-lg font-semibold text-gray-700 flex items-center">
@@ -368,7 +373,6 @@ const VideoDetection = () => {
         </div>
       </div>
       
-      {/* Information and Results */}
       <div className="bg-white rounded-lg shadow-md p-6 mt-6 border border-gray-100">
         <h4 className="text-lg font-semibold text-gray-700 flex items-center mb-3">
           <AlertTriangle className="w-5 h-5 mr-2 text-indigo-500" />
@@ -389,7 +393,6 @@ const VideoDetection = () => {
               </ul>
             </div>
             
-            {/* PANEL DERECHO: Lista interactiva de detecciones */}
             <div className="bg-gray-50 p-4 rounded-md border border-gray-200 flex flex-col h-full max-h-[300px]">
               <p className="text-sm font-bold text-gray-700 mb-2">Actitudes Detectadas (Clic para saltar)</p>
               
@@ -402,7 +405,7 @@ const VideoDetection = () => {
                     const style = BEHAVIOR_LABELS[det.tipo_evento] || { label: det.tipo_evento, color: 'bg-gray-200 text-gray-700 border-gray-300' };
 
                     return (
-                      <button 
+                      <button
                         key={index}
                         onClick={() => {
                           if (videoRef.current) {
@@ -440,7 +443,6 @@ const VideoDetection = () => {
           </div>
         )}
 
-        {/* JSON de depuración oculto en un "details" para no ensuciar la UI */}
         {(analysisResults || analysisReport) && (
           <details className="mt-6 bg-gray-50 rounded-md border border-gray-200 text-xs text-gray-700">
             <summary className="p-3 font-semibold cursor-pointer hover:bg-gray-100">Ver JSON completo (Debug)</summary>

@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
+import { API_BASE } from '../config'; 
 import api from '../lib/api';
 import { jwtDecode } from 'jwt-decode';
 
@@ -17,12 +18,29 @@ export const useGenerarImagenes = () => {
   const [resultsData, setResultsData] = useState<any>(null);
   const [videoId, setVideoId] = useState<number | null>(null);
 
-  // === RUTAS COMENTADAS ===
-  // const [selectedPath, setSelectedPath] = useState('');
-  // const [paths, setPaths] = useState<any[]>([]);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // REFERENCIA SECRETA: Guarda el ID del video actual para poder borrarlo
+  const currentVideoIdRef = useRef<string | number | null>(null);
+
+  // =========================================================================
+  // LIMPIEZA AUTOMÁTICA AL SALIR DE LA PANTALLA
+  // =========================================================================
+  useEffect(() => {
+    return () => {
+      if (currentVideoIdRef.current) {
+        api.del(`/api/analysis/media/videos/${currentVideoIdRef.current}/`)
+           .catch(() => console.log("Limpieza silenciosa al cambiar de pantalla."));
+      }
+    };
+  }, []);
+
+  const resolveUrl = (path: string) => {
+    if (!path) return path;
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    return `${API_BASE.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+  };
 
   useEffect(() => {
     const cargarConfiguracion = async () => {
@@ -33,9 +51,6 @@ export const useGenerarImagenes = () => {
         const idEmpresa = decoded.idEmpresa;
         const response = await api.get(`/api/menuOpciones/rutas/configurar/?idEmpresa=${idEmpresa}`);
         if (Array.isArray(response)) {
-            // === RUTAS COMENTADAS ===
-            // const soloSubRutas = response.filter((item: any) => item.codigo && item.codigo.startsWith('SUBRUTA_'));
-            // setPaths(soloSubRutas);
             const fpsConfig = response.find((item: any) => item.codigo === 'FPS_DEFAULT');
             if (fpsConfig) setFps(Number(fpsConfig.valor));
         }
@@ -53,8 +68,19 @@ export const useGenerarImagenes = () => {
     }
   };
 
-  const handleReuploadClick = () => {
+  // =========================================================================
+  // LIMPIEZA MANUAL AL CERRAR MODAL O CARGAR NUEVO VIDEO
+  // =========================================================================
+  const handleReuploadClick = async () => {
     if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+    
+    if (currentVideoIdRef.current) {
+      try {
+        await api.del(`/api/analysis/media/videos/${currentVideoIdRef.current}/`);
+      } catch (error) {}
+      currentVideoIdRef.current = null;
+    }
+
     setFile(null); setVideoUrl(null); setIsProcessing(false); setIsModalOpen(false);
     setKeypointsData([]); setResultsData(null); setErrorMessage(null); setVideoId(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -63,9 +89,6 @@ export const useGenerarImagenes = () => {
   const handleGenerateImages = async () => {
     if (!file) return;
     
-    // === VALIDACIÓN DE RUTA COMENTADA ===
-    // if (!selectedPath) { alert("Por favor selecciona una ruta de guardado."); return; }
-
     setErrorMessage(null); setIsProcessing(true);
     const fd = new FormData(); fd.append('video', file);
 
@@ -73,7 +96,9 @@ export const useGenerarImagenes = () => {
       const resUpload = await api.postForm('/api/analysis/media/videos/upload/', fd);
       const createdVideoId = resUpload?.idVideoUpload || resUpload?.id || resUpload?.video_id;
       if (!createdVideoId) throw new Error('No se recibió el ID.');
+      
       setVideoId(createdVideoId);
+      currentVideoIdRef.current = createdVideoId;
 
       await api.post(`/api/analysis/videos/${createdVideoId}/process/`, { fps_skip: fps });
 
@@ -88,12 +113,30 @@ export const useGenerarImagenes = () => {
             setResultsData(resStatus.analysis_report || resStatus);
 
             try {
-              const keypointsRes = await api.get(`/api/analysis/videos/${createdVideoId}/keypoints-json/`);
-              const framesData = keypointsRes.keypoints_data || keypointsRes.keypoints || keypointsRes.frames || keypointsRes.data || (Array.isArray(keypointsRes) ? keypointsRes : []);
+              const jsonUrl = resStatus.analysis_report?.rutaJsonKeypoints 
+                ? resolveUrl(`media/${resStatus.analysis_report.rutaJsonKeypoints}?t=${new Date().getTime()}`)
+                : resolveUrl(`media/reports/keypoints_video_${createdVideoId}.json?t=${new Date().getTime()}`);
+
+              const response = await fetch(jsonUrl);
+              if (!response.ok) throw new Error(`HTTP ${response.status}`);
+              const keypointsRes = await response.json();
+
+              let framesData = [];
+              if (Array.isArray(keypointsRes)) {
+                  framesData = keypointsRes;
+              } else if (keypointsRes && typeof keypointsRes === 'object') {
+                  framesData = keypointsRes.keypoints || keypointsRes.keypoints_data || [];
+              }
+
               setKeypointsData(framesData);
+              
               if (framesData.length > 0) setIsModalOpen(true);
-              else setErrorMessage("No se detectaron poses.");
-            } catch (err) { setErrorMessage("Falló la descarga de coordenadas."); }
+              else setErrorMessage("El análisis terminó, pero no se detectaron poses humanas.");
+              
+            } catch (err) { 
+                setErrorMessage("Falló la lectura del archivo JSON en el servidor."); 
+                console.error(err);
+            }
           } else if (currentStatus === 'failed') {
             setIsProcessing(false);
             if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
@@ -104,7 +147,7 @@ export const useGenerarImagenes = () => {
         } catch (error: any) {
           setIsProcessing(false);
           if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
-          setErrorMessage('Se perdió la conexión.');
+          setErrorMessage('Se perdió la conexión al consultar el estado.');
         }
       };
 
@@ -117,7 +160,6 @@ export const useGenerarImagenes = () => {
   };
 
   const handleSaveResults = async () => {
-    // Validamos solo que haya un ID de video y datos extraídos
     if (!videoId || keypointsData.length === 0) {
       alert("Faltan datos para descargar la colección de fotogramas.");
       return;
@@ -125,31 +167,27 @@ export const useGenerarImagenes = () => {
     try {
       alert("Preparando el ZIP de descarga... Esto puede tardar unos segundos dependiendo de la cantidad de frames.");
       
-      // 1. Usamos nuestro api.postBlob para traer el ZIP
       const blob = await api.postBlob(`/api/analysis/videos/${videoId}/save-to-disk/`, {
-        // target_path: selectedPath, // YA NO ENVIAMOS ESTO
         fps_usados: fps,
         width: width,
         height: height,
         results: keypointsData 
       });
 
-      // 2. Creamos la URL temporal
       const url = window.URL.createObjectURL(blob);
-      
-      // 3. Forzamos la descarga nativa
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `Dataset_VideoFrames_${videoId}.zip`);
       document.body.appendChild(link);
       link.click();
       
-      // 4. Limpiamos la memoria
       link.parentNode?.removeChild(link);
       window.URL.revokeObjectURL(url);
 
       alert("¡Colección de fotogramas descargada exitosamente!");
-      setIsModalOpen(false);
+      
+      // MAGIA: Ejecutamos la limpieza total tras una descarga exitosa
+      handleReuploadClick(); 
     } catch (error: any) {
       console.error("Error al descargar el ZIP:", error);
       alert("Error al intentar descargar los archivos en formato ZIP.");
@@ -161,7 +199,6 @@ export const useGenerarImagenes = () => {
     isProcessing, isModalOpen, setIsModalOpen,
     keypointsData, setKeypointsData, 
     resultsData, errorMessage,
-    // selectedPath, setSelectedPath, paths, // === COMENTADO ===
     fileInputRef, handleFileChange, handleGenerateImages, handleReuploadClick, handleSaveResults
   };
 };

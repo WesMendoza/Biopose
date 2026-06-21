@@ -5,7 +5,8 @@ const GestionEmpresas = () => {
   const {
     empresas, loading,
     isEditModalOpen, isDeleteModalOpen,
-    selectedEmpresa, setSelectedEmpresa,
+    selectedEmpresa, 
+    updateEditEmpresaField,
     handleEditClick, handleDeleteClick,
     closeModals, handleSaveEmpresa, confirmDelete
   } = useEmpresas();
@@ -38,10 +39,10 @@ const GestionEmpresas = () => {
                 <td className="p-4 text-sm text-gray-700">{empresa.ruc}</td>
                 <td className="p-4 text-sm text-gray-700">{empresa.direccion}</td>
                 <td className="p-4 flex justify-center space-x-2">
-                  <button onClick={() => handleEditClick(empresa)} className="p-1 text-blue-600 hover:bg-blue-100 rounded">
+                  <button onClick={() => handleEditClick(empresa)} className="p-1 text-blue-600 hover:bg-blue-100 rounded" title="Editar Empresa">
                     <Edit2 size={18} />
                   </button>
-                  <button onClick={() => handleDeleteClick(empresa)} className="p-1 text-red-600 hover:bg-red-100 rounded">
+                  <button onClick={() => handleDeleteClick(empresa)} className="p-1 text-red-600 hover:bg-red-100 rounded" title="Eliminar Empresa">
                     <Trash2 size={18} />
                   </button>
                 </td>
@@ -57,14 +58,46 @@ const GestionEmpresas = () => {
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
             <button onClick={closeModals} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"><X size={20} /></button>
             <h2 className="text-xl font-bold mb-4">Editar Empresa</h2>
+            
             <div className="space-y-4">
-              <input type="text" value={selectedEmpresa.nombreEmpresa} onChange={(e) => setSelectedEmpresa({ ...selectedEmpresa, nombreEmpresa: e.target.value })} className="w-full p-2 border rounded-md" />
-              <input type="text" value={selectedEmpresa.ruc} onChange={(e) => setSelectedEmpresa({ ...selectedEmpresa, ruc: e.target.value })} className="w-full p-2 border rounded-md" />
-              <input type="text" value={selectedEmpresa.direccion} onChange={(e) => setSelectedEmpresa({ ...selectedEmpresa, direccion: e.target.value })} className="w-full p-2 border rounded-md" />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de la Empresa</label>
+                <input 
+                  type="text" 
+                  value={selectedEmpresa.nombreEmpresa} 
+                  onChange={(e) => updateEditEmpresaField('nombreEmpresa', e.target.value)} 
+                  className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" 
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">RUC Ecuatoriano</label>
+                <input 
+                  type="tel" 
+                  value={selectedEmpresa.ruc} 
+                  onChange={(e) => updateEditEmpresaField('ruc', e.target.value)} 
+                  placeholder="13 dígitos numéricos"
+                  className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" 
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
+                <input 
+                  type="text" 
+                  value={selectedEmpresa.direccion} 
+                  onChange={(e) => updateEditEmpresaField('direccion', e.target.value)} 
+                  className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" 
+                />
+              </div>
             </div>
+
             <div className="mt-6 flex justify-end space-x-3">
-              <button onClick={closeModals} className="px-4 py-2 border rounded-md">Cancelar</button>
-              <button onClick={handleSaveEmpresa} className="px-4 py-2 bg-green-600 text-white rounded-md flex items-center space-x-2"><Save size={18} /><span>Guardar</span></button>
+              <button onClick={closeModals} className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50">Cancelar</button>
+              <button onClick={handleSaveEmpresa} className="px-4 py-2 bg-green-600 text-white rounded-md flex items-center space-x-2 hover:bg-green-700">
+                <Save size={18} />
+                <span>Guardar</span>
+              </button>
             </div>
           </div>
         </div>
@@ -77,8 +110,8 @@ const GestionEmpresas = () => {
             <h2 className="text-xl font-bold mb-2">¿Eliminar Empresa?</h2>
             <p className="mb-6 text-sm text-gray-600">Esta acción no se puede deshacer.</p>
             <div className="flex justify-center space-x-4">
-              <button onClick={closeModals} className="px-6 py-2 border rounded-md">No</button>
-              <button onClick={confirmDelete} className="px-6 py-2 bg-red-600 text-white rounded-md">Sí, eliminar</button>
+              <button onClick={closeModals} className="px-6 py-2 border rounded-md text-gray-700 hover:bg-gray-50">No</button>
+              <button onClick={confirmDelete} className="px-6 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Sí, eliminar</button>
             </div>
           </div>
         </div>
