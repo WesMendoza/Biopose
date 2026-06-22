@@ -36,7 +36,7 @@ export const useVideoDetection = () => {
     return () => {
       if (currentVideoIdRef.current) {
         api.del(`/api/analysis/media/videos/${currentVideoIdRef.current}/`)
-           .catch(() => console.log("Limpieza silenciosa al cambiar de pantalla."));
+           .catch(() => {});
       }
     };
   }, []);
