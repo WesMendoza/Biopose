@@ -42,33 +42,36 @@ export const useVideoActionMultiPerson = () => {
     return `${API_BASE.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
   };
 
-  const loadKeypointsJson = async (rutaJson: string) => {
+  const loadKeypointsJson = async () => {
+    if (!currentVideoIdRef.current) return;
     try {
-      const timestamp = new Date().getTime();
-      const cleanPath = rutaJson.replace(/^\//, '');
-      const fileUrl = resolveUrl(`media/${cleanPath}?t=${timestamp}`);
+      const res = await api.get(`/api/analysis/videos/${currentVideoIdRef.current}/keypoints-json/`);
       
-      const response = await fetch(fileUrl);
-      if (!response.ok) throw new Error(`El archivo físico no se encontró`);
-      
-      const rawData = await response.json();
+      let payload = res.keypoints || {};
+      if (typeof payload === 'string') {
+        try { payload = JSON.parse(payload); } catch (e) {}
+      }
 
       let kps = [];
       let dets = [];
 
-      if (Array.isArray(rawData)) {
-          kps = rawData; 
-      } else if (rawData && typeof rawData === 'object') {
-          kps = rawData.keypoints || [];
-          dets = rawData.detections || [];
+      if (Array.isArray(payload)) {
+          kps = payload; 
+      } else if (payload && typeof payload === 'object') {
+          kps = payload.frames || payload.keypoints || payload.frames_data || [];
+          dets = payload.detections || payload.eventos || [];
+          
+          if (kps.length === 0 && dets.length === 0) {
+            setErrorMessage(`[DEBUG] JSON vacío. Keys detectadas: ${Object.keys(payload).join(', ')}`);
+          }
       }
       
       setKeypointsData(kps);
       setDetailedDetections(dets); 
-      setJsonKeypointsUrl(fileUrl);
+      setJsonKeypointsUrl(res.ruta_json_keypoints || null);
     } catch (error: any) {
-      console.warn('Error descargando JSON:', error);
-      setErrorMessage(`No se pudo leer el JSON: ${error.message}`);
+      console.warn('Error descargando JSON desde API:', error);
+      setErrorMessage(`No se pudo cargar los datos del análisis: ${error.message}`);
     }
   };
 
@@ -111,13 +114,13 @@ export const useVideoActionMultiPerson = () => {
       // =================================================================
       // RASTREADOR 1: Petición enviada
       // =================================================================
-      console.log("🚀 ENVIANDO PETICIÓN A CELERY (MULTI-PERSONA):", {
-        video_id: createdVideoId, modo_comportamiento: mode, motor_ia: poseMode,
-        salto_frames: framesSkip, confianza_exigida: confidenceThreshold
-      });
+      // console.log("🚀 ENVIANDO PETICIÓN A CELERY (MULTI-PERSONA):", {
+      //   video_id: createdVideoId, modo_comportamiento: mode, motor_ia: poseMode,
+      //   salto_frames: framesSkip, confianza_exigida: confidenceThreshold
+      // });
 
       await api.post(`/api/analysis/videos/${createdVideoId}/process/`, {
-        mode, dimension: poseMode, fps_skip: framesSkip, confidence_threshold: confidenceThreshold,
+        mode, dimension: poseMode, fps_skip: framesSkip, confidence_threshold: confidenceThreshold, analysis_type: 'multipersona'
       });
 
       setProgress(45);
@@ -136,13 +139,12 @@ export const useVideoActionMultiPerson = () => {
             // =================================================================
             // RASTREADOR 2: Resultado recibido
             // =================================================================
-            console.log("✅ ANÁLISIS MULTI-PERSONA COMPLETADO:", resStatus);
+            // console.log("✅ ANÁLISIS MULTI-PERSONA COMPLETADO:", resStatus);
 
             const streamUrl = resStatus.stream_url || resStatus.video_url || resStatus.download_url || resStatus.rutaVideoProcesado || resStatus.rutaArchivoProcesado || null;
             if (streamUrl) setDownloadUrl(resolveUrl(streamUrl));
 
-            const ruta = resStatus.analysis_report?.rutaJsonKeypoints || `reports/keypoints_video_${createdVideoId}.json`;
-            await loadKeypointsJson(ruta);
+            await loadKeypointsJson();
             
           } else if (resStatus?.status === 'processing') {
             setProgress((prev) => (prev < 90 ? prev + 5 : 90));
@@ -158,7 +160,7 @@ export const useVideoActionMultiPerson = () => {
           setIsProcessing(false);
           setErrorMessage('Se perdió la conexión.');
         }
-      }, 3000);
+      }, 10000);
     } catch (error: any) {
       setIsProcessing(false);
       setProgress(0);

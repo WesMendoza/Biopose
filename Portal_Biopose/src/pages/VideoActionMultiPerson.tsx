@@ -1,5 +1,7 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Upload, Settings, RefreshCw, CheckCircle, AlertTriangle, CloudUpload, Loader, Download } from 'lucide-react';
+import policeImg from '../assets/police.jpg';
+import angryPoliceImg from '../assets/angry_police.jpg';
 import { useVideoActionMultiPerson } from '../hooks/useVideoActionMultiPerson';
 
 // DICCIONARIO PARA COMPORTAMIENTOS MULTIPERSONA
@@ -21,30 +23,28 @@ const VideoActionMultiPerson = () => {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isHostile, setIsHostile] = useState(false);
 
-  const getClosestDetections = () => {
-    if (!videoRef.current || !keypointsData || !Array.isArray(keypointsData)) return [];
-    const currentTime = videoRef.current.currentTime;
-    let minDiff = Infinity;
-    let closestTime = -1;
+  // Mapeamos para soportar tanto los nombres antiguos como los nuevos del backend
+  const normalizedDetections = (detailedDetections || []).map((det: any) => ({
+    ...det,
+    tipo_evento: det.tipo_evento ?? det.label ?? det.behavior ?? det.tipo ?? 'UNKNOWN',
+    segundo_inicio: det.segundo_inicio ?? det.inicio_segundo ?? det.start_time ?? 0,
+    segundo_fin: det.segundo_fin ?? det.fin_segundo ?? det.end_time ?? 0,
+    confianza: det.confianza ?? det.precision_maxima ?? det.confidence ?? 0,
+  }));
 
-    for (const frame of keypointsData) {
-      if (frame && frame.timestamp_sec !== undefined) {
-        const diff = Math.abs(frame.timestamp_sec - currentTime);
-        if (diff < minDiff) {
-          minDiff = diff;
-          closestTime = frame.timestamp_sec;
-        }
-      }
-    }
-    if (minDiff > 0.5) return [];
-    return keypointsData.filter((frame: any) => frame.timestamp_sec === closestTime);
-  };
+  const shouldShowResult = !!analysisResults || !!analysisReport;
+  const totalFrames = analysisResults?.total_frames ?? analysisReport?.totalFrames;
+  const durationSeconds = analysisResults?.duration_seconds ?? analysisReport?.totalDuracionSegundos;
+  const processingSeconds = analysisResults?.processing_time_seconds ?? analysisReport?.tiempoProcesamientoSegundos;
 
-  // =========================================================================
-  // MAGIA MULTIPERSONA CON CAJAS DELIMITADORAS Y ETIQUETAS
-  // =========================================================================
- const drawOverlay = () => {
+  const allowedBehaviors = ['PELEAR', 'DISTURBIO', 'FIGHT', 'DISTURBANCE'];
+  const filteredDetections = normalizedDetections.filter((det: any) =>
+    allowedBehaviors.includes(det.tipo_evento?.toUpperCase())
+  );
+
+  const drawOverlay = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || !keypointsData || !Array.isArray(keypointsData)) return;
@@ -65,24 +65,49 @@ const VideoActionMultiPerson = () => {
     const currentTime = video.currentTime;
 
     // Buscamos el frame actual en el array 'frames'
-    const currentFrame = keypointsData.find((f: any) => Math.abs(f.timestamp_sec - currentTime) < 0.2);
-    if (!currentFrame || !currentFrame.persons) return;
-
-    const allowedBehaviors = ['PELEAR', 'DISTURBIO', 'FIGHT', 'DISTURBANCE'];
+    const currentFrame = keypointsData.find((f: any) => Math.abs((f.timestamp_sec ?? f.time ?? 0) - currentTime) < 0.2);
     
     // Evaluamos la alerta global de la escena
-    const activeEvent = (detailedDetections || []).find((det: any) => 
-      allowedBehaviors.includes(det.tipo_evento?.toUpperCase()) &&
-      currentTime >= det.segundo_inicio && currentTime <= (det.segundo_fin + 2.0)
+    const activeEvent = filteredDetections.find((det: any) => 
+      currentTime >= det.segundo_inicio && currentTime <= ((det.segundo_fin || det.segundo_inicio) + 2.0)
     );
 
-    const isHostile = !!activeEvent;
-    const boxColor = isHostile ? 'rgba(239, 68, 68, 1)' : 'rgba(34, 197, 94, 1)';
-    const boxBgColor = isHostile ? 'rgba(239, 68, 68, 0.2)' : 'transparent'; 
+    const currentlyHostile = !!activeEvent;
+    // Actualizamos el estado para la imagen del policía (si cambió)
+    setIsHostile(currentlyHostile);
+
+    let eventType = 'neutral';
+    if (activeEvent) {
+      const typeStr = (activeEvent.tipo_evento || '').toLowerCase();
+      if (typeStr.includes('disturbio') || typeStr.includes('disturbance') || typeStr.includes('altercado')) {
+        eventType = 'disturbio';
+      } else {
+        eventType = 'pelea'; // pelear, fight, etc.
+      }
+    }
+
+    let boxColor = 'rgba(34, 197, 94, 1)'; // Verde (Neutral)
+    let boxBgColor = 'transparent';
+    let skeletonColor = 'rgba(34, 197, 94, 0.8)'; // Verde
+    let pointColor = 'rgba(34, 197, 94, 1)'; // Verde
+
+    if (eventType === 'disturbio') {
+      boxColor = 'rgba(249, 115, 22, 1)'; // Naranja
+      boxBgColor = 'rgba(249, 115, 22, 0.2)';
+      skeletonColor = 'rgba(249, 115, 22, 0.8)';
+      pointColor = 'rgba(255, 255, 255, 1)'; // Puntos blancos con borde naranja
+    } else if (eventType === 'pelea') {
+      boxColor = 'rgba(239, 68, 68, 1)'; // Rojo
+      boxBgColor = 'rgba(239, 68, 68, 0.2)';
+      skeletonColor = 'rgba(239, 68, 68, 0.8)';
+      pointColor = 'rgba(255, 255, 255, 1)'; // Puntos blancos con borde rojo
+    }
+
+    if (!currentFrame || !currentFrame.persons) return;
 
     // DIBUJAR A TODAS LAS PERSONAS DETECTADAS EN LA PANTALLA
     currentFrame.persons.forEach((personData: any) => {
-      const personPoints = personData.keypoints_json;
+      const personPoints = personData.keypoints_json || personData.keypoints;
       if (!Array.isArray(personPoints)) return;
 
       let minX = Infinity, minY = Infinity, maxX = 0, maxY = 0;
@@ -92,14 +117,17 @@ const VideoActionMultiPerson = () => {
         [5, 6], [11, 12], [5, 11], [6, 12], [0, 1], [0, 2], [1, 3], [2, 4] 
       ];
 
-      ctx.strokeStyle = isHostile ? 'rgba(239, 68, 68, 0.8)' : 'rgba(14, 165, 233, 0.8)';
+      ctx.strokeStyle = skeletonColor;
       ctx.lineWidth = Math.max(video.videoWidth / 300, 2); 
 
       skeletonConnections.forEach(([p1, p2]) => {
-        const pt1 = personPoints.find((p: any) => p.id === p1);
-        const pt2 = personPoints.find((p: any) => p.id === p2);
+        const pt1 = personPoints.find((p: any) => (p.id !== undefined ? p.id : p.name) === p1 || p.id === p1);
+        const pt2 = personPoints.find((p: any) => (p.id !== undefined ? p.id : p.name) === p2 || p.id === p2);
         
-        if (pt1 && pt2 && pt1.confidence > 0.4 && pt2.confidence > 0.4) {
+        const pt1Conf = pt1?.confidence ?? 1.0;
+        const pt2Conf = pt2?.confidence ?? 1.0;
+
+        if (pt1 && pt2 && pt1Conf > 0.4 && pt2Conf > 0.4) {
           ctx.beginPath();
           ctx.moveTo(pt1.x * scaleX, pt1.y * scaleY);
           ctx.lineTo(pt2.x * scaleX, pt2.y * scaleY);
@@ -108,7 +136,8 @@ const VideoActionMultiPerson = () => {
       });
 
       personPoints.forEach((point: any) => {
-        if (point.confidence > 0.4) {
+        const conf = point.confidence ?? 1.0;
+        if (conf > 0.4) {
           const px = point.x * scaleX;
           const py = point.y * scaleY;
           if (px < minX) minX = px;
@@ -118,7 +147,7 @@ const VideoActionMultiPerson = () => {
 
           ctx.beginPath();
           ctx.arc(px, py, Math.max(video.videoWidth / 250, 3), 0, 2 * Math.PI);
-          ctx.fillStyle = isHostile ? 'rgba(255, 255, 255, 1)' : 'rgba(234, 179, 8, 1)';
+          ctx.fillStyle = pointColor;
           ctx.fill();
           ctx.strokeStyle = boxColor;
           ctx.lineWidth = Math.max(video.videoWidth / 500, 1);
@@ -137,10 +166,10 @@ const VideoActionMultiPerson = () => {
       }
     });
 
-    // MARCA DE ALERTA GLOBAL EN LA ESQUINA (Idéntico a tu sistema antiguo)
-    if (isHostile) {
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.9)';
-        ctx.fillRect(20, 20, 240, 50);
+    // MARCA DE ALERTA GLOBAL EN LA ESQUINA
+    if (currentlyHostile && activeEvent) {
+        ctx.fillStyle = eventType === 'disturbio' ? 'rgba(249, 115, 22, 0.9)' : 'rgba(239, 68, 68, 0.9)';
+        ctx.fillRect(20, 20, 250, 50);
         ctx.fillStyle = 'white';
         ctx.font = `bold ${Math.max(video.videoWidth / 40, 18)}px Arial`;
         ctx.fillText(`⚠️ ${activeEvent.tipo_evento.toUpperCase()}`, 35, 52);
@@ -158,16 +187,6 @@ const VideoActionMultiPerson = () => {
     }
     drawOverlay();
   }, [keypointsData]);
-
-  const shouldShowResult = !!analysisResults || !!analysisReport;
-  const totalFrames = analysisResults?.total_frames ?? analysisReport?.totalFrames;
-  const durationSeconds = analysisResults?.duration_seconds ?? analysisReport?.totalDuracionSegundos;
-  const processingSeconds = analysisResults?.processing_time_seconds ?? analysisReport?.tiempoProcesamientoSegundos;
-
-  const allowedBehaviors = ['PELEAR', 'DISTURBIO', 'FIGHT', 'DISTURBANCE'];
-  const filteredDetections = (detailedDetections || []).filter((det: any) =>
-    allowedBehaviors.includes(det.tipo_evento?.toUpperCase())
-  );
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -288,8 +307,16 @@ const VideoActionMultiPerson = () => {
         </div>
       </div>
       
-      <div className="bg-white rounded-lg shadow-md p-6 mt-6 border border-gray-100">
-        <h4 className="text-lg font-semibold text-gray-700 flex items-center mb-3"><AlertTriangle className="w-5 h-5 mr-2 text-indigo-500" /> Información y Resultado</h4>
+      <div className="bg-white rounded-lg shadow-md p-6 mt-6 border border-gray-100 relative overflow-hidden">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-lg font-semibold text-gray-700 flex items-center"><AlertTriangle className="w-5 h-5 mr-2 text-indigo-500" /> Información y Resultado</h4>
+          <div className="flex items-center space-x-3">
+            <span className={`text-sm font-bold px-3 py-1 rounded-full transition-colors ${isHostile ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+              {isHostile ? '¡Alerta Activa!' : 'Todo en orden'}
+            </span>
+            <img src={isHostile ? angryPoliceImg : policeImg} alt="Estado" className={`w-12 h-12 rounded-full border-2 transition-all ${isHostile ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.6)]' : 'border-green-500'}`} />
+          </div>
+        </div>
         <hr className="mb-4 border-gray-200" />
 
         {shouldShowResult ? (
@@ -316,16 +343,26 @@ const VideoActionMultiPerson = () => {
                     return (
                       <button key={index} onClick={() => { if (videoRef.current) { videoRef.current.currentTime = det.segundo_inicio; videoRef.current.play(); } }} className="w-full text-left bg-white p-3 rounded-lg border border-gray-200 shadow-sm hover:border-red-400 hover:shadow transition-all flex items-center justify-between group">
                         <div className="flex items-center gap-3">
-                          <span className="font-mono font-bold text-red-600 bg-red-50 px-2 py-1 rounded">{mins}:{secs}</span>
-                          <span className={`text-xs font-bold px-2 py-1 rounded border ${style.color}`}>{style.label}</span>
+                          <span className={`text-xs font-bold px-2 py-1 rounded uppercase border ${style.color}`}>
+                            {style.label}
+                          </span>
+                          <span className="text-sm text-gray-600 font-mono bg-gray-100 px-2 py-0.5 rounded">
+                            {mins}:{secs}
+                          </span>
                         </div>
-                        <div className="text-xs text-gray-400 font-medium">{(det.confianza * 100).toFixed(0)}% <span className="hidden sm:inline">confianza</span></div>
+                        <div className="text-right">
+                          <p className="text-xs text-gray-500 mb-0.5">Confianza</p>
+                          <p className="text-sm font-bold text-indigo-600">{(det.confianza * 100).toFixed(1)}%</p>
+                        </div>
                       </button>
                     );
                   })
                 ) : (
-                  <div className="h-full flex items-center justify-center text-sm text-gray-500 italic text-center px-4">
-                    No se detectaron peleas ni disturbios en este video.
+                  <div className="h-full flex flex-col items-center justify-center text-sm text-gray-500 italic text-center px-4">
+                    <p>No se detectaron peleas ni disturbios en este video.</p>
+                    <pre className="text-xs text-left w-full mt-4 overflow-auto bg-gray-100 border border-gray-300 p-2 text-black not-italic font-mono">
+                      DEBUG: {JSON.stringify(normalizedDetections.slice(0, 3), null, 2)}
+                    </pre>
                   </div>
                 )}
               </div>

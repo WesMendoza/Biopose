@@ -1,145 +1,358 @@
 import { useState, useRef, useCallback } from 'react';
 import { API_BASE } from '../config'; 
 
-// Transformar http://localhost:8000 a ws://localhost:8000
-const WS_BASE = API_BASE.replace(/^http/, 'ws');
+// =========================================================================
+// TIPOS
+// =========================================================================
+export interface RealtimeDetection {
+  behavior: string;
+  label: string;
+  timestamp?: number;
+}
 
+export interface FinalDetection {
+  timestamp: number;
+  behaviors: string[];
+}
+
+// Mapeo de etiquetas internas a nombres legibles
+const BEHAVIOR_LABELS: Record<string, string> = {
+  hidden_hands: 'Manos ocultas detrás',
+  excessive_gaze: 'Mirada excesiva / Giros bruscos',
+  hand_under_clothes: 'Mano bajo ropa',
+};
+
+// =========================================================================
+// HOOK
+// =========================================================================
 export const useLiveDetection = () => {
+  // --- Estado de la UI ---
   const [isStreaming, setIsStreaming] = useState(false);
   const [framesSkip, setFramesSkip] = useState(3);
   const [poseMode, setPoseMode] = useState<'2D' | '3D'>('2D');
+  const [deviceType, setDeviceType] = useState<'local' | 'remote'>('local');
+  const [remoteUrl, setRemoteUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  // Referencias a los elementos HTML y la conexión
+  // --- Estado de detecciones ---
+  const [realtimeDetections, setRealtimeDetections] = useState<RealtimeDetection[]>([]);
+  const [finalDetections, setFinalDetections] = useState<FinalDetection[]>([]);
+  const [numPeople, setNumPeople] = useState(0);
+  const [isFinished, setIsFinished] = useState(false);
+
+  // --- Referencias para Renderizado y Lógica ---
+  // Referencia al elemento canvas para mostrar el resultado
+  const imgRef = useRef<HTMLCanvasElement>(null);
+  
+  // Elementos ocultos para captura local (WebSockets)
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const frameIntervalRef = useRef<number | null>(null);
   
-  // Función para dibujar los puntos devueltos por YOLO
-  const drawKeypoints = useCallback((keypoints: any[]) => {
-    const canvas = canvasRef.current;
-    const video = videoRef.current;
-    if (!canvas || !video) return;
+  // Conexiones
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const webSocketRef = useRef<WebSocket | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  
+  // Timers
+  const frameIntervalRef = useRef<number | null>(null);
+  const seenBehaviorsRef = useRef<Set<string>>(new Set());
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Asegurar que el canvas tenga el mismo tamaño que el video
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height); // Limpiar frame anterior
-
-    // Dibujar los puntos (keypoints)
-    keypoints.forEach((kp: any) => {
-      ctx.beginPath();
-      ctx.arc(kp.x, kp.y, 5, 0, 2 * Math.PI);
-      ctx.fillStyle = 'red';
-      ctx.fill();
-    });
-
-    // NOTA: Aquí puedes agregar lógica para dibujar las líneas del esqueleto si tu backend te devuelve las conexiones
-  }, []);
-
-  const startStream = async () => {
-    setError(null);
+  // =======================================================================
+  // INICIAR STREAM REMOTO (SSE)
+  // =======================================================================
+  const startRemoteStream = useCallback(() => {
     try {
-      // 1. Encender la cámara web
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+      const source = new EventSource(`${API_BASE}/api/analysis/live/stream/?url=${encodeURIComponent(remoteUrl)}&fps_skip=${framesSkip}&mode=${poseMode}`);
+      eventSourceRef.current = source;
+
+      source.onopen = () => setIsStreaming(true);
+
+      source.onmessage = (event) => {
+        if (event.data === 'EOF') {
+          stopStream();
+          setIsFinished(true);
+          return;
+        }
+
+        try {
+          const data = JSON.parse(event.data);
+
+          if (data.final_detections) {
+            setFinalDetections(data.final_detections);
+            return;
+          }
+
+          if (data.error) {
+            setError(data.error);
+            stopStream();
+            return;
+          }
+
+          if (data.frame && imgRef.current) {
+            const canvas = imgRef.current;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              const img = new Image();
+              img.onload = () => {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+              };
+              img.src = 'data:image/jpeg;base64,' + data.frame;
+            }
+          }
+
+        if (data.num_people !== undefined) {
+          setNumPeople(data.num_people);
+        }
+
+        if (data.detections && Array.isArray(data.detections)) {
+          data.detections.forEach((behavior: string) => {
+            if (!seenBehaviorsRef.current.has(behavior)) {
+              seenBehaviorsRef.current.add(behavior);
+              setRealtimeDetections(prev => [
+                ...prev,
+                { behavior, label: BEHAVIOR_LABELS[behavior] || behavior }
+              ]);
+            }
+          });
+        }
+      } catch (e) {
+        // Parse error ignore
+      }
+    };
+
+    source.onerror = () => {
+      stopStream();
+      if (!isFinished) setError('Se perdió la conexión con el servidor.');
+    };
+    } catch (e) {
+      setError("Error al iniciar la conexión remota.");
+      console.error(e);
+    }
+  }, [framesSkip, poseMode, remoteUrl]);
+
+  // =======================================================================
+  // INICIAR STREAM LOCAL (WebSockets + getUserMedia)
+  // =======================================================================
+  const startLocalStream = useCallback(async () => {
+    try {
+      // 1. Pedir permisos y abrir la cámara web local
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      streamRef.current = stream;
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.play();
       }
-      streamRef.current = stream;
 
-      // 2. Conectar al WebSocket del backend
-      // (Asegúrate de configurar esta ruta en Django Channels)
-      const wsUrl = `${WS_BASE}/ws/live-detection/`;
+      // 2. Conectar al WebSocket
+      const wsUrl = API_BASE.replace(/^http/, 'ws') + '/ws/live-detection/';
       const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
+      webSocketRef.current = ws;
 
       ws.onopen = () => {
         setIsStreaming(true);
-        console.log("WebSocket Conectado!");
-
-        // 3. Empezar a capturar fotogramas y enviarlos
-        const tempCanvas = document.createElement('canvas');
-        const tempCtx = tempCanvas.getContext('2d');
-
-        // Extraemos un frame cada 100ms (Ajustable según el server)
-        frameIntervalRef.current = setInterval(() => {
-          if (videoRef.current && ws.readyState === WebSocket.OPEN) {
-            tempCanvas.width = videoRef.current.videoWidth;
-            tempCanvas.height = videoRef.current.videoHeight;
-            tempCtx?.drawImage(videoRef.current, 0, 0);
+        
+        // Función para enviar un fotograma
+        const sendFrame = () => {
+          if (ws.readyState === WebSocket.OPEN && videoRef.current && canvasRef.current) {
+            const video = videoRef.current;
+            const canvas = canvasRef.current;
+            const ctx = canvas.getContext('2d');
             
-            // Convertimos la imagen a base64
-            const frameBase64 = tempCanvas.toDataURL('image/jpeg', 0.7).split(',')[1];
-            
-            // Enviamos el payload a Django
-            ws.send(JSON.stringify({
-              frame: frameBase64,
-              fps_skip: framesSkip,
-              mode: poseMode
-            }));
+            if (video.videoWidth > 0 && video.videoHeight > 0 && ctx) {
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              
+              const dataUrl = canvas.toDataURL('image/jpeg', 0.6); // Reducir calidad a 60% para que vuele por la red
+              const base64Data = dataUrl.replace(/^data:image\/jpeg;base64,/, '');
+              
+              ws.send(JSON.stringify({
+                frame: base64Data,
+                fps_skip: framesSkip,
+                mode: poseMode
+              }));
+            } else {
+              // Si el video aún no carga, intentar de nuevo en 50ms
+              frameIntervalRef.current = window.setTimeout(sendFrame, 50);
+            }
           }
-        }, 100); 
-      };
+        };
 
-      ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        // Supongamos que Django nos devuelve un arreglo de 'keypoints'
-        if (data.keypoints) {
-          drawKeypoints(data.keypoints);
-        }
+        // Enviar el primer frame inmediatamente
+        sendFrame();
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'result') {
+               if (data.frame && imgRef.current) {
+                 const canvas = imgRef.current;
+                 const ctx = canvas.getContext('2d');
+                 if (ctx) {
+                   const img = new Image();
+                   img.onload = () => {
+                     canvas.width = img.width;
+                     canvas.height = img.height;
+                     ctx.drawImage(img, 0, 0);
+                   };
+                   img.src = 'data:image/jpeg;base64,' + data.frame;
+                 }
+               }
+               if (data.num_people !== undefined) {
+                 setNumPeople(data.num_people);
+               }
+               if (data.detections && Array.isArray(data.detections)) {
+                 data.detections.forEach((behavior: string) => {
+                   if (!seenBehaviorsRef.current.has(behavior)) {
+                     seenBehaviorsRef.current.add(behavior);
+                     setRealtimeDetections(prev => [
+                       ...prev,
+                       { behavior, label: BEHAVIOR_LABELS[behavior] || behavior }
+                     ]);
+                   }
+                 });
+               }
+
+               // Enviar el SIGUIENTE frame solo DESPUÉS de recibir la respuesta del anterior
+               // Esto evita que los frames se desordenen en la red y causen "parpadeo"
+               const delay = framesSkip > 0 ? framesSkip * 33 : 33;
+               frameIntervalRef.current = window.setTimeout(sendFrame, delay);
+
+            } else if (data.type === 'final') {
+               setFinalDetections(data.detections || []);
+            } else if (data.error) {
+               setError(data.error);
+               stopStream();
+            }
+          } catch (e) {
+            // Ignorar
+          }
+        };
       };
 
       ws.onerror = () => {
-        setError("Error de conexión con el WebSocket de Django.");
+        setError('Error en la conexión WebSocket.');
         stopStream();
+      };
+      
+      ws.onclose = () => {
+        if (isStreaming) {
+           stopStream();
+           setIsFinished(true);
+        }
       };
 
     } catch (err) {
-      setError("No se pudo acceder a la cámara o conectar al servidor.");
       console.error(err);
+      setError('No se pudo acceder a la cámara web. Verifique los permisos del navegador.');
+      setIsStreaming(false);
     }
-  };
+  }, [framesSkip, poseMode]);
 
-  const stopStream = () => {
-    // Apagar cámara
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
+  // =======================================================================
+  // INICIAR (LÓGICA CENTRAL)
+  // =======================================================================
+  const startStream = useCallback(() => {
+    setError(null);
+    setIsFinished(false);
+    setRealtimeDetections([]);
+    setFinalDetections([]);
+    setNumPeople(0);
+    seenBehaviorsRef.current = new Set();
+    
+    if (deviceType === 'remote') {
+      startRemoteStream();
+    } else {
+      startLocalStream();
     }
-    // Cerrar WebSocket
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
+  }, [deviceType, startRemoteStream, startLocalStream]);
+
+  // =======================================================================
+  // DETENER STREAM
+  // =======================================================================
+  const stopStream = useCallback(() => {
+    // 1. Limpiar SSE
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
     }
-    // Detener intervalo de fotogramas
+    
+    // 2. Limpiar WebSockets y cámara local
     if (frameIntervalRef.current) {
       clearInterval(frameIntervalRef.current);
       frameIntervalRef.current = null;
     }
+    if (webSocketRef.current) {
+      webSocketRef.current.close();
+      webSocketRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    
     setIsStreaming(false);
-  };
+  }, []);
 
-  const toggleStream = () => {
+  // =======================================================================
+  // TOGGLE Y REINICIAR
+  // =======================================================================
+  const toggleStream = useCallback(() => {
     if (isStreaming) {
       stopStream();
+      setIsFinished(true); // Al detener manualmente, marcamos como terminado para ver resultados
     } else {
       startStream();
     }
-  };
+  }, [isStreaming, stopStream, startStream]);
+
+  const resetAll = useCallback(() => {
+    stopStream();
+    setRealtimeDetections([]);
+    setFinalDetections([]);
+    setNumPeople(0);
+    setError(null);
+    setIsFinished(false);
+    seenBehaviorsRef.current = new Set();
+    if (imgRef.current) {
+      const canvas = imgRef.current;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+  }, [stopStream]);
+
+  const isValidRemoteUrl = useCallback((url: string) => {
+    const regex = /^(rtsp|http|https):\/\/[^\s/$.?#].[^\s]*$/i;
+    return regex.test(url);
+  }, []);
 
   return {
     isStreaming,
+    isFinished,
     framesSkip, setFramesSkip,
     poseMode, setPoseMode,
+    deviceType, setDeviceType,
+    remoteUrl, setRemoteUrl,
     error,
-    videoRef,   // <-- Necesitarás poner esto en tu <video ref={videoRef}> en la pantalla
-    canvasRef,  // <-- Necesitarás poner esto en tu <canvas ref={canvasRef}> sobre el video
-    toggleStream
+    numPeople,
+    realtimeDetections,
+    finalDetections,
+    
+    imgRef,
+    videoRef,
+    canvasRef,
+
+    toggleStream,
+    resetAll,
+    isValidRemoteUrl,
   };
 };

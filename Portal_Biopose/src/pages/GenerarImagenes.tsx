@@ -83,7 +83,7 @@ const GenerarImagenes = () => {
         const newData = [...prev];
         const frameData = { ...newData[currentIndex] };
 
-        let rawPoints = frameData.keypoints_json || frameData.keypoints || [];
+        let rawPoints = frameData.persons?.[0]?.keypoints_json || frameData.keypoints_json || frameData.keypoints || [];
         let pointsArray = Array.isArray(rawPoints) && rawPoints.length > 0 && Array.isArray(rawPoints[0]) ? rawPoints[0] : rawPoints;
 
         const isNormalized = pointsArray.length > 0 && pointsArray.every((p: any) => p.x <= 1.5 && p.y <= 1.5);
@@ -102,7 +102,9 @@ const GenerarImagenes = () => {
           ptToUpdate.confidence = 1.0; 
         }
 
-        if (frameData.keypoints_json) {
+        if (frameData.persons && frameData.persons.length > 0) {
+            frameData.persons[0].keypoints_json = pointsArray;
+        } else if (frameData.keypoints_json) {
             if (Array.isArray(frameData.keypoints_json) && Array.isArray(frameData.keypoints_json[0])) frameData.keypoints_json[0] = pointsArray;
             else frameData.keypoints_json = pointsArray;
         } else {
@@ -126,7 +128,7 @@ const GenerarImagenes = () => {
   };
 
   const currentFrameData = keypointsData[currentIndex] || {};
-  const rawP = currentFrameData.keypoints_json || currentFrameData.keypoints || [];
+  const rawP = currentFrameData.persons?.[0]?.keypoints_json || currentFrameData.keypoints_json || currentFrameData.keypoints || [];
   const validKeypoints = Array.isArray(rawP) && rawP.length > 0 && Array.isArray(rawP[0]) ? rawP[0] : rawP;
   
   const isNormalized = validKeypoints.length > 0 && validKeypoints.every((p: any) => p.x <= 1.5 && p.y <= 1.5);

@@ -65,7 +65,7 @@ export const useVideoDetection = () => {
       if (Array.isArray(rawData)) {
           kps = rawData; 
       } else if (rawData && typeof rawData === 'object') {
-          kps = rawData.keypoints || [];
+          kps = rawData.frames || rawData.keypoints || [];
           dets = rawData.detections || [];
       }
       
@@ -116,7 +116,7 @@ export const useVideoDetection = () => {
       setProgress(30);
 
       await api.post(`/api/analysis/videos/${createdVideoId}/process/`, {
-        mode, dimension: poseMode, fps_skip: framesSkip, confidence_threshold: confidenceThreshold,
+        mode, dimension: poseMode, fps_skip: framesSkip, confidence_threshold: confidenceThreshold, analysis_type: 'individual'
       });
 
       setProgress(45);
@@ -152,7 +152,7 @@ export const useVideoDetection = () => {
           setIsProcessing(false);
           setErrorMessage('Se perdió la conexión al consultar el estado.');
         }
-      }, 3000);
+      }, 10000);
     } catch (error: any) {
       setIsProcessing(false);
       setProgress(0);

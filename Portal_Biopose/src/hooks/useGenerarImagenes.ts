@@ -100,7 +100,7 @@ export const useGenerarImagenes = () => {
       setVideoId(createdVideoId);
       currentVideoIdRef.current = createdVideoId;
 
-      await api.post(`/api/analysis/videos/${createdVideoId}/process/`, { fps_skip: fps });
+      await api.post(`/api/analysis/videos/${createdVideoId}/process/`, { fps_skip: fps, analysis_type: 'individual' });
 
       const pollResults = async () => {
         try {
@@ -125,7 +125,7 @@ export const useGenerarImagenes = () => {
               if (Array.isArray(keypointsRes)) {
                   framesData = keypointsRes;
               } else if (keypointsRes && typeof keypointsRes === 'object') {
-                  framesData = keypointsRes.keypoints || keypointsRes.keypoints_data || [];
+                  framesData = keypointsRes.frames || keypointsRes.keypoints || keypointsRes.keypoints_data || [];
               }
 
               setKeypointsData(framesData);
