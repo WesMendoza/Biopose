@@ -243,6 +243,10 @@ const VideoActionMultiPerson = () => {
               <RefreshCw className="w-4 h-4 mr-2" /> Limpiar y procesar nuevo
             </button>
           </div>
+          <div className="flex items-center mt-3 text-amber-700 text-xs px-3 py-2 bg-amber-50 rounded border border-amber-200">
+            <AlertTriangle className="w-4 h-4 mr-2 shrink-0" />
+             <span>Reducir el salto de frames aumenta la carga computacional y alarga los tiempos de espera.</span>
+          </div>
 
           {isProcessing && (
             <div className="mt-4">

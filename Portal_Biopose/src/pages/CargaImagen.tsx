@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import { CheckCircle, CloudUpload, Image as ImageIcon, Loader, Settings, X, ZoomIn, ZoomOut, Maximize, AlertCircle, User, Info, Download, Trash2, PlusCircle } from 'lucide-react';
 import { useCargaImagen } from '../hooks/useCargaImagen';
 import { KEYPOINT_NAMES, POSE_CONNECTIONS } from '../utils/ai-visuals';
+import uploadGif from '../assets/upload.gif';
+import bannerImg from '../assets/banner.png';
 
 const CargaImagen = () => {
   const {
@@ -73,9 +75,28 @@ const CargaImagen = () => {
 
   return (
     <div className="p-8 max-w-7xl mx-auto font-sans">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Carga de Imagen</h1>
+      <div className="flex flex-col lg:flex-row gap-8 lg:min-h-[calc(100vh-8rem)]">
+        
+        {/* COLUMNA IZQUIERDA (Título + Banner) */}
+        <div className="lg:w-1/3 flex flex-col">
+          <h1 className="text-2xl font-bold text-gray-800 mb-6">Extracción de Keypoints</h1>
+          <div className="rounded-2xl overflow-hidden shadow-sm border border-gray-100 relative shrink-0 group min-h-[300px] flex-grow">
+            <img src={bannerImg} alt="Banner Image" className="absolute inset-0 w-full h-full object-cover object-[center_25%] transition-transform duration-700 group-hover:scale-105" />
+            <div className="absolute inset-0 bg-gradient-to-t from-indigo-900/90 via-indigo-900/40 to-transparent flex flex-col justify-end p-8">
+               <h2 className="text-2xl xl:text-3xl font-bold text-white mb-3">Procesamiento de Imágenes</h2>
+               <p className="text-indigo-100 text-sm leading-relaxed">
+                 Sube una imagen para que la Inteligencia Artificial extraiga el esqueleto corporal y lo convierta a los formatos normalizados. Configura la dimensión final y previsualiza los puntos clave en tiempo real.
+               </p>
+            </div>
+          </div>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* CONTENIDO PRINCIPAL (COLUMNAS DERECHAS) */}
+        <div className="lg:w-2/3 flex flex-col">
+          <div className="hidden lg:block h-[56px] shrink-0" aria-hidden="true"></div>
+          
+          <div className="flex-grow flex flex-col justify-center">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         
         {/* --- COLUMNA 1: CONFIGURACIÓN Y LOTE --- */}
         <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100 flex flex-col">
@@ -144,7 +165,7 @@ const CargaImagen = () => {
                 </div>
               ) : (
                 <div className="flex flex-col items-center">
-                  <CloudUpload className="w-12 h-12 text-indigo-400 mb-3" />
+                  <img src={uploadGif} alt="Upload" className="w-20 h-20 mb-3 opacity-80 mix-blend-multiply" />
                   <p className="text-gray-600 font-medium">Arrastra y suelta tu archivo aquí</p>
                 </div>
               )}
@@ -157,7 +178,9 @@ const CargaImagen = () => {
             )}
           </div>
         </div>
-
+      </div>
+      </div>
+      </div>
       </div>
 
       {/* --- MODALES --- */}

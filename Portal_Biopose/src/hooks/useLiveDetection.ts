@@ -62,7 +62,7 @@ export const useLiveDetection = () => {
   // =======================================================================
   const startRemoteStream = useCallback(() => {
     try {
-      const source = new EventSource(`${API_BASE}/api/analysis/live/stream/?url=${encodeURIComponent(remoteUrl)}&fps_skip=${framesSkip}&mode=${poseMode}`);
+      const source = new EventSource(`${API_BASE}/api/analysis/live/stream/?source=remote&url=${encodeURIComponent(remoteUrl)}&fps_skip=${framesSkip}&mode=${poseMode}`);
       eventSourceRef.current = source;
 
       source.onopen = () => setIsStreaming(true);
@@ -162,11 +162,15 @@ export const useLiveDetection = () => {
             const ctx = canvas.getContext('2d');
             
             if (video.videoWidth > 0 && video.videoHeight > 0 && ctx) {
-              canvas.width = video.videoWidth;
-              canvas.height = video.videoHeight;
+              // Limitar el ancho máximo para mejorar la velocidad y reducir el lag (Ej: 640px)
+              const MAX_WIDTH = 640;
+              const scale = Math.min(MAX_WIDTH / video.videoWidth, 1);
+              
+              canvas.width = video.videoWidth * scale;
+              canvas.height = video.videoHeight * scale;
               ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
               
-              const dataUrl = canvas.toDataURL('image/jpeg', 0.6); // Reducir calidad a 60% para que vuele por la red
+              const dataUrl = canvas.toDataURL('image/jpeg', 0.5); // Reducir calidad para mejorar fluidez
               const base64Data = dataUrl.replace(/^data:image\/jpeg;base64,/, '');
               
               ws.send(JSON.stringify({
@@ -217,10 +221,9 @@ export const useLiveDetection = () => {
                  });
                }
 
-               // Enviar el SIGUIENTE frame solo DESPUÉS de recibir la respuesta del anterior
-               // Esto evita que los frames se desordenen en la red y causen "parpadeo"
-               const delay = framesSkip > 0 ? framesSkip * 33 : 33;
-               frameIntervalRef.current = window.setTimeout(sendFrame, delay);
+               // Enviar el SIGUIENTE frame inmediatamente después de procesar el anterior
+               // Esto maximiza la fluidez eliminando el retraso artificial
+               frameIntervalRef.current = window.setTimeout(sendFrame, 10);
 
             } else if (data.type === 'final') {
                setFinalDetections(data.detections || []);

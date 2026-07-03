@@ -211,15 +211,26 @@ const LiveDetection = () => {
                 </div>
               )}
 
+              {/* Video local nativo para fluidez máxima */}
+              <video 
+                ref={videoRef} 
+                className="w-full h-full object-contain absolute top-0 left-0"
+                style={{ display: (isStreaming && deviceType === 'local') ? 'block' : 'none' }} 
+                autoPlay playsInline muted 
+              />
+
               {/* Renderizado en Canvas para evitar parpadeos visuales al decodificar base64 */}
               <canvas
                 ref={renderCanvasRef}
-                className="w-full h-full object-contain"
-                style={{ display: isStreaming || isFinished ? 'block' : 'none' }}
+                className="w-full h-full object-contain absolute top-0 left-0"
+                style={{ 
+                   display: isStreaming || isFinished ? 'block' : 'none',
+                   mixBlendMode: (isStreaming && deviceType === 'local') ? 'screen' : 'normal',
+                   pointerEvents: 'none'
+                }}
               />
 
-              {/* Elementos ocultos para captura local */}
-              <video ref={videoRef} style={{ display: 'none' }} autoPlay playsInline muted />
+              {/* Canvas oculto para captura local */}
               <canvas ref={canvasRef} style={{ display: 'none' }} />
 
               {/* Placeholder cuando no hay stream */}

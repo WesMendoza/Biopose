@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Upload, Settings, RefreshCw, CheckCircle, AlertTriangle, CloudUpload, Loader, Image as ImageIcon, X, ChevronLeft, ChevronRight, Download, ZoomOut, ZoomIn, Maximize, User, Info, AlertCircle } from 'lucide-react';
 import { useGenerarImagenes } from '../hooks/useGenerarImagenes';
 import { KEYPOINT_NAMES, POSE_CONNECTIONS } from '../utils/ai-visuals'; 
+import videoGif from '../assets/video.gif';
+import bannerImg from '../assets/Banner_video.png';
 
 const GenerarImagenes = () => {
   const {
@@ -137,9 +139,29 @@ const GenerarImagenes = () => {
 
   return (
     <div className="p-8 max-w-7xl mx-auto font-sans">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Generación de Imágenes</h1>
+      <div className="flex flex-col lg:flex-row gap-8 lg:min-h-[calc(100vh-8rem)]">
+        
+        {/* COLUMNA IZQUIERDA (Título + Banner) */}
+        <div className="lg:w-1/3 flex flex-col">
+          <h1 className="text-2xl font-bold text-gray-800 mb-6">Generación de Imágenes (Video)</h1>
+        
+          <div className="rounded-2xl overflow-hidden shadow-sm border border-gray-100 relative shrink-0 group min-h-[300px] flex-grow">
+            <img src={bannerImg} alt="Banner Image" className="absolute inset-0 w-full h-full object-cover object-[center_25%] transition-transform duration-700 group-hover:scale-105" />
+            <div className="absolute inset-0 bg-gradient-to-t from-indigo-900/90 via-indigo-900/40 to-transparent flex flex-col justify-end p-8">
+               <h2 className="text-2xl xl:text-3xl font-bold text-white mb-3">Procesamiento de Video</h2>
+               <p className="text-indigo-100 text-sm leading-relaxed">
+                 Sube un video para que la Inteligencia Artificial extraiga el esqueleto corporal de cada fotograma (FPS). Obtendrás un dataset unificado con todas las posiciones clave detectadas a lo largo de la grabación.
+               </p>
+            </div>
+          </div>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* CONTENIDO PRINCIPAL (COLUMNAS DERECHAS) */}
+        <div className="lg:w-2/3 flex flex-col">
+          <div className="hidden lg:block h-[56px] shrink-0" aria-hidden="true"></div>
+          
+          <div className="flex-grow flex flex-col justify-center">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100 flex flex-col">
           <h4 className="text-lg font-semibold text-gray-700 flex items-center mb-4"><Settings className="w-5 h-5 mr-2 text-indigo-500" /> Configuración de Extracción</h4>
           <hr className="mb-4 border-gray-200" />
@@ -171,7 +193,10 @@ const GenerarImagenes = () => {
               {videoUrl ? (
                 <div className="flex flex-col items-center"><video src={videoUrl} className="h-32 mb-4 rounded bg-black" /><p className="text-sm font-medium text-indigo-600">{file?.name}</p></div>
               ) : (
-                <div className="flex flex-col items-center"><CloudUpload className="w-12 h-12 text-indigo-400 mb-3" /><p className="text-gray-600 font-medium">Arrastra y suelta tu video aquí</p></div>
+                <div className="flex flex-col items-center">
+                  <img src={videoGif} alt="Upload Video" className="w-20 h-20 mb-3 opacity-80 mix-blend-multiply" />
+                  <p className="text-gray-600 font-medium">Arrastra y suelta tu video aquí</p>
+                </div>
               )}
             </div>
             {videoUrl && (
@@ -182,6 +207,9 @@ const GenerarImagenes = () => {
             )}
           </div>
         </div>
+      </div>
+      </div>
+      </div>
       </div>
 
       {isModalOpen && (

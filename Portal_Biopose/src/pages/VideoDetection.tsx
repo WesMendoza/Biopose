@@ -1,5 +1,7 @@
 import { AlertTriangle, CheckCircle, CloudUpload, Download, Loader, RefreshCw } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import policeImg from '../assets/police.jpg';
+import angryPoliceImg from '../assets/angry_police.jpg';
 import { useVideoDetection } from '../hooks/useVideoDetection';
 
 // DICCIONARIO EXCLUSIVO PARA COMPORTAMIENTOS SOSPECHOSOS
@@ -43,6 +45,17 @@ const VideoDetection = () => {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isHostile, setIsHostile] = useState(false);
+
+  // FILTRO: Validamos ambos idiomas
+  const allowedBehaviors = [
+    'excessive_gaze', 'hidden_hands', 'hand_under_clothes',
+    'Mirada Excesiva', 'Manos ocultas detrás', 'Mano en el bolsillo o bajo ropa'
+  ];
+  
+  const filteredDetections = (detailedDetections || []).filter((det: any) =>
+    allowedBehaviors.includes(det.tipo_evento)
+  );
 
 // 1. Obtiene las detecciones exactas para el segundo actual del video
   const getClosestDetections = () => {
@@ -103,6 +116,13 @@ const VideoDetection = () => {
 
     const scaleX = isNormalized ? video.videoWidth : (video.videoWidth / 640);
     const scaleY = isNormalized ? video.videoHeight : (video.videoHeight / 640);
+
+    const currentTime = video.currentTime;
+    const activeEvent = filteredDetections.find((det: any) => 
+      currentTime >= det.segundo_inicio && currentTime <= ((det.segundo_fin || det.segundo_inicio) + 2.0)
+    );
+    const currentlyHostile = !!activeEvent;
+    setIsHostile(currentlyHostile);
 
     currentDetections.forEach((frame: any) => {
       const personsList = frame.persons || [frame]; // Fallback if it's the old format
@@ -165,16 +185,6 @@ const VideoDetection = () => {
   const durationSeconds = analysisResults?.duration_seconds ?? analysisReport?.totalDuracionSegundos;
   const processingSeconds = analysisResults?.processing_time_seconds ?? analysisReport?.tiempoProcesamientoSegundos;
   const averageConfidence = analysisResults?.analysis_report?.average_confidence ?? analysisReport?.confianzaPromedio;
-
-  // FILTRO: Validamos ambos idiomas
-  const allowedBehaviors = [
-    'excessive_gaze', 'hidden_hands', 'hand_under_clothes',
-    'Mirada Excesiva', 'Manos ocultas detrás', 'Mano en el bolsillo o bajo ropa'
-  ];
-  
-  const filteredDetections = (detailedDetections || []).filter((det: any) =>
-    allowedBehaviors.includes(det.tipo_evento)
-  );
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -384,11 +394,19 @@ const VideoDetection = () => {
         </div>
       </div>
       
-      <div className="bg-white rounded-lg shadow-md p-6 mt-6 border border-gray-100">
-        <h4 className="text-lg font-semibold text-gray-700 flex items-center mb-3">
-          <AlertTriangle className="w-5 h-5 mr-2 text-indigo-500" />
-          Información y Resultado
-        </h4>
+      <div className="bg-white rounded-lg shadow-md p-6 mt-6 border border-gray-100 relative overflow-hidden">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-lg font-semibold text-gray-700 flex items-center">
+            <AlertTriangle className="w-5 h-5 mr-2 text-indigo-500" />
+            Información y Resultado
+          </h4>
+          <div className="flex items-center space-x-3">
+            <span className={`text-sm font-bold px-3 py-1 rounded-full transition-colors ${isHostile ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+              {isHostile ? '¡Alerta Activa!' : 'Todo en orden'}
+            </span>
+            <img src={isHostile ? angryPoliceImg : policeImg} alt="Estado" className={`w-12 h-12 rounded-full border-2 transition-all ${isHostile ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.6)]' : 'border-green-500'}`} />
+          </div>
+        </div>
         <hr className="mb-4 border-gray-200" />
 
         {shouldShowResult ? (

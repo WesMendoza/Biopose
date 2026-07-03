@@ -110,12 +110,12 @@ const Sidebar = () => {
             <div>
               <button 
                 onClick={() => toggleSection('pose')}
-                title="Estimación de posturas"
+                title="Configuracion de Dataset"
                 className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors ${openSection === 'pose' ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800'} ${isSidebarOpen ? 'justify-between' : 'justify-center'}`}
               >
                 <div className="flex items-center space-x-3">
                   <UserCheck className="w-5 h-5 flex-shrink-0" />
-                  {isSidebarOpen && <span>Estimación de posturas</span>}
+                  {isSidebarOpen && <span>Configuracion de Dataset</span>}
                 </div>
                 {isSidebarOpen && (openSection === 'pose' ? <ChevronDown className="w-4 h-4 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 flex-shrink-0" />)}
               </button>
@@ -125,7 +125,7 @@ const Sidebar = () => {
                   {tieneAcceso('/app/pose/routes') && (
                     <NavLink to="/app/pose/routes" className={subNavLinkClass} title="Configuración de rutas">
                       <FolderOpen className="w-4 h-4 flex-shrink-0" />
-                      {isSidebarOpen && <span>Configuración de rutas</span>}
+                      {isSidebarOpen && <span>Configuración de FPS</span>}
                     </NavLink>
                   )}
                   {tieneAcceso('/app/pose/image') && (
@@ -143,7 +143,7 @@ const Sidebar = () => {
                   {tieneAcceso('/app/pose/verify') && (
                     <NavLink to="/app/pose/verify" className={subNavLinkClass} title="Verifica tus imágenes">
                       <UserCheck className="w-4 h-4 flex-shrink-0" />
-                      {isSidebarOpen && <span>Verifica tus imágenes</span>}
+                      {isSidebarOpen && <span>Verifica tu Dataset</span>}
                     </NavLink>
                   )}
                 </div>
@@ -183,7 +183,7 @@ const Sidebar = () => {
                   {tieneAcceso('/app/events/individual/live') && (
                     <NavLink to="/app/events/individual/live" className={subNavLinkClass} title="Detección en vivo (Individual)">
                       <Video className="w-4 h-4 flex-shrink-0" />
-                      {isSidebarOpen && <span>Detección en vivo</span>}
+                      {isSidebarOpen && <span>Detección en tiempo real</span>}
                     </NavLink>
                   )}
 
@@ -201,7 +201,7 @@ const Sidebar = () => {
                   {tieneAcceso('/app/events/multi/live') && (
                     <NavLink to="/app/events/multi/live" className={subNavLinkClass} title="Detección en vivo (Multipersona)">
                       <Video className="w-4 h-4 flex-shrink-0" />
-                      {isSidebarOpen && <span>Detección en vivo</span>}
+                      {isSidebarOpen && <span>Detección en tiempo real</span>}
                     </NavLink>
                   )}
                 </div>
