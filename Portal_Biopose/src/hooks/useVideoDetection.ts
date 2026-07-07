@@ -81,6 +81,10 @@ export const useVideoDetection = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
+      if (currentVideoIdRef.current) {
+        api.del(`/api/analysis/media/videos/${currentVideoIdRef.current}/`).catch(() => {});
+        currentVideoIdRef.current = null;
+      }
       setFile(selectedFile);
       setVideoUrl(URL.createObjectURL(selectedFile));
       setIsProcessing(false);
@@ -128,9 +132,6 @@ export const useVideoDetection = () => {
           if (resStatus?.status === 'completed') {
             window.clearInterval(intervalId);
             setProgress(100);
-            setIsProcessing(false);
-            setAnalysisResults(resStatus);
-            setAnalysisReport(resStatus.analysis_report || null);
 
             const streamUrl = resStatus.stream_url || resStatus.video_url || resStatus.download_url || resStatus.rutaVideoProcesado || resStatus.rutaArchivoProcesado || null;
             if (streamUrl) setDownloadUrl(resolveUrl(streamUrl));
@@ -138,6 +139,10 @@ export const useVideoDetection = () => {
             const ruta = resStatus.analysis_report?.rutaJsonKeypoints || `reports/keypoints_video_${createdVideoId}.json`;
             await loadKeypointsJson(ruta);
             
+            // Actualizamos la UI al final para que aparezca todo de forma instantánea
+            setAnalysisReport(resStatus.analysis_report || null);
+            setAnalysisResults(resStatus);
+            setIsProcessing(false);
           } else if (resStatus?.status === 'processing') {
             setProgress((prev) => (prev < 90 ? prev + 5 : 90));
           } else if (resStatus?.status === 'failed') {

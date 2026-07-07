@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Upload, Settings, RefreshCw, CheckCircle, AlertTriangle, CloudUpload, Loader, Download } from 'lucide-react';
+import { AlertTriangle, CheckCircle, CloudUpload, Download, Loader, RefreshCw, Info } from 'lucide-react';
 import policeImg from '../assets/police.jpg';
 import angryPoliceImg from '../assets/angry_police.jpg';
 import { useVideoActionMultiPerson } from '../hooks/useVideoActionMultiPerson';
@@ -24,6 +24,13 @@ const VideoActionMultiPerson = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isHostile, setIsHostile] = useState(false);
+
+  // Cuando se limpia el video o no hay resultados, reseteamos la alerta
+  useEffect(() => {
+    if (!videoUrl || !analysisResults) {
+      setIsHostile(false);
+    }
+  }, [videoUrl, analysisResults]);
 
   // Mapeamos para soportar tanto los nombres antiguos como los nuevos del backend
   const normalizedDetections = (detailedDetections || []).map((det: any) => ({
@@ -67,41 +74,17 @@ const VideoActionMultiPerson = () => {
     // Buscamos el frame actual en el array 'frames'
     const currentFrame = keypointsData.find((f: any) => Math.abs((f.timestamp_sec ?? f.time ?? 0) - currentTime) < 0.2);
     
-    // Evaluamos la alerta global de la escena
-    const activeEvent = filteredDetections.find((det: any) => 
-      currentTime >= det.segundo_inicio && currentTime <= ((det.segundo_fin || det.segundo_inicio) + 2.0)
+    // Encontrar TODOS los eventos activos en este momento (añadimos solo 0.5s de gracia para evitar superposiciones largas)
+    const activeEvents = filteredDetections.filter((det: any) => 
+      currentTime >= det.segundo_inicio && currentTime <= ((det.segundo_fin || det.segundo_inicio) + 0.5)
     );
+    
+    // El evento principal activo será el más reciente para la alerta global (policía en la UI)
+    const activeEvent = [...activeEvents].sort((a: any, b: any) => b.segundo_inicio - a.segundo_inicio)[0];
 
     const currentlyHostile = !!activeEvent;
     // Actualizamos el estado para la imagen del policía (si cambió)
     setIsHostile(currentlyHostile);
-
-    let eventType = 'neutral';
-    if (activeEvent) {
-      const typeStr = (activeEvent.tipo_evento || '').toLowerCase();
-      if (typeStr.includes('disturbio') || typeStr.includes('disturbance') || typeStr.includes('altercado')) {
-        eventType = 'disturbio';
-      } else {
-        eventType = 'pelea'; // pelear, fight, etc.
-      }
-    }
-
-    let boxColor = 'rgba(34, 197, 94, 1)'; // Verde (Neutral)
-    let boxBgColor = 'transparent';
-    let skeletonColor = 'rgba(34, 197, 94, 0.8)'; // Verde
-    let pointColor = 'rgba(34, 197, 94, 1)'; // Verde
-
-    if (eventType === 'disturbio') {
-      boxColor = 'rgba(249, 115, 22, 1)'; // Naranja
-      boxBgColor = 'rgba(249, 115, 22, 0.2)';
-      skeletonColor = 'rgba(249, 115, 22, 0.8)';
-      pointColor = 'rgba(255, 255, 255, 1)'; // Puntos blancos con borde naranja
-    } else if (eventType === 'pelea') {
-      boxColor = 'rgba(239, 68, 68, 1)'; // Rojo
-      boxBgColor = 'rgba(239, 68, 68, 0.2)';
-      skeletonColor = 'rgba(239, 68, 68, 0.8)';
-      pointColor = 'rgba(255, 255, 255, 1)'; // Puntos blancos con borde rojo
-    }
 
     if (!currentFrame || !currentFrame.persons) return;
 
@@ -109,6 +92,34 @@ const VideoActionMultiPerson = () => {
     currentFrame.persons.forEach((personData: any) => {
       const personPoints = personData.keypoints_json || personData.keypoints;
       if (!Array.isArray(personPoints)) return;
+      const pid = personData.person_id;
+
+      // Evaluar en qué evento está participando ESTA persona específicamente
+      const personEvents = activeEvents.filter((e: any) => {
+        const pids = e.detalles?.pids || (e.detalles?.pid !== undefined ? [e.detalles.pid] : []);
+        // Si el backend no envió pids o si está incluido, aplicamos el evento (fallback)
+        return pids.length === 0 || pids.includes(pid);
+      });
+
+      const isPeleando = personEvents.some((e: any) => (e.tipo_evento || '').toLowerCase().includes('pelea'));
+      const isDisturbio = personEvents.some((e: any) => (e.tipo_evento || '').toLowerCase().includes('disturbio') || (e.tipo_evento || '').toLowerCase().includes('altercado'));
+
+      let boxColor = 'rgba(34, 197, 94, 1)'; // Verde (Neutral)
+      let boxBgColor = 'transparent';
+      let skeletonColor = 'rgba(34, 197, 94, 0.8)'; // Verde
+      let pointColor = 'rgba(34, 197, 94, 1)'; // Verde
+
+      if (isPeleando) {
+        boxColor = 'rgba(239, 68, 68, 1)'; // Rojo
+        boxBgColor = 'rgba(239, 68, 68, 0.2)';
+        skeletonColor = 'rgba(239, 68, 68, 0.8)';
+        pointColor = 'rgba(255, 255, 255, 1)';
+      } else if (isDisturbio) {
+        boxColor = 'rgba(249, 115, 22, 1)'; // Naranja
+        boxBgColor = 'rgba(249, 115, 22, 0.2)';
+        skeletonColor = 'rgba(249, 115, 22, 0.8)';
+        pointColor = 'rgba(255, 255, 255, 1)';
+      }
 
       let minX = Infinity, minY = Infinity, maxX = 0, maxY = 0;
 
@@ -166,13 +177,37 @@ const VideoActionMultiPerson = () => {
       }
     });
 
-    // MARCA DE ALERTA GLOBAL EN LA ESQUINA
-    if (currentlyHostile && activeEvent) {
-        ctx.fillStyle = eventType === 'disturbio' ? 'rgba(249, 115, 22, 0.9)' : 'rgba(239, 68, 68, 0.9)';
-        ctx.fillRect(20, 20, 250, 50);
+    // MARCA DE ALERTA GLOBAL EN LA ESQUINA (Dinámico y apilable)
+    if (activeEvents.length > 0) {
+      let startY = 20;
+      // Ordenamos para que Pelea siempre salga arriba si hay varios, o simplemente los listamos
+      const displayEvents = [...activeEvents].sort((a: any, b: any) => {
+        if ((a.tipo_evento || '').toLowerCase().includes('pelea')) return -1;
+        return 1;
+      });
+
+      displayEvents.forEach((evt: any) => {
+        const typeStr = (evt.tipo_evento || '').toLowerCase();
+        const isDisturbio = typeStr.includes('disturbio') || typeStr.includes('altercado');
+        
+        const fontSize = Math.max(video.videoWidth / 45, 16);
+        ctx.font = `bold ${fontSize}px Arial`;
+        const textStr = `⚠️ ${evt.tipo_evento.toUpperCase()}`;
+        const textWidth = ctx.measureText(textStr).width;
+        
+        const paddingX = 15;
+        const paddingY = 10;
+        const boxHeight = fontSize + paddingY * 2;
+        
+        ctx.fillStyle = isDisturbio ? 'rgba(249, 115, 22, 0.9)' : 'rgba(239, 68, 68, 0.9)';
+        ctx.fillRect(20, startY, textWidth + paddingX * 2, boxHeight);
+        
         ctx.fillStyle = 'white';
-        ctx.font = `bold ${Math.max(video.videoWidth / 40, 18)}px Arial`;
-        ctx.fillText(`⚠️ ${activeEvent.tipo_evento.toUpperCase()}`, 35, 52);
+        // 0.85 de fontSize es un buen aproximado para alinear la línea base de texto
+        ctx.fillText(textStr, 20 + paddingX, startY + paddingY + fontSize * 0.85);
+        
+        startY += boxHeight + 10; // Espaciado entre etiquetas si hay varias
+      });
     }
   };
 
@@ -192,19 +227,30 @@ const VideoActionMultiPerson = () => {
     <div className="p-8 max-w-7xl mx-auto">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Detección de Acciones Multipersona</h1>
 
-      <div className="bg-white rounded-lg shadow-md p-6 mb-8 border border-gray-100">
-        <h4 className="text-lg font-semibold text-gray-700 mb-2">Cargar Video para Análisis</h4>
-        <p className="text-gray-500 mb-6 text-sm">El sistema analizará el video en busca de interacciones hostiles entre múltiples personas.</p>
+      <div className="w-full mb-8">
+        <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100">
+          <h4 className="text-lg font-semibold text-gray-700 mb-2">Cargar Video para Análisis</h4>
+          <p className="text-gray-500 mb-6 text-sm">El sistema analizará el video en busca de interacciones hostiles entre múltiples personas.</p>
 
-        <div className="space-y-4">
+          <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Seleccionar archivo de video:</label>
             <input type="file" accept="video/*" onChange={handleFileChange} ref={fileInputRef} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer border border-gray-300 rounded-md p-1" />
           </div>
 
-          <div className="grid gap-3 lg:grid-cols-4">
+          <div className="grid gap-3 lg:grid-cols-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Modo de procesamiento</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center relative group w-max">
+                Modo de procesamiento
+                <Info className="w-4 h-4 ml-1 text-indigo-500 cursor-pointer" />
+                <div className="absolute bottom-full mb-2 left-0 sm:left-1/2 transform sm:-translate-x-1/2 hidden group-hover:block w-72 bg-gray-800 text-white text-xs rounded-md p-3 shadow-lg z-50 pointer-events-none">
+                  <ul className="space-y-2">
+                    <li><span className="font-semibold text-indigo-300">Operativo:</span> Prioriza velocidad. Aplica salto de frames y usa sustracción de fondo.</li>
+                    <li><span className="font-semibold text-indigo-300">Analítico:</span> Prioriza precisión. Ignora salto de frames pero omite pausas estáticas.</li>
+                    <li><span className="font-semibold text-indigo-300">Debug:</span> Análisis exhaustivo. Desactiva sustracción de fondo, procesa todo lentamente.</li>
+                  </ul>
+                </div>
+              </label>
               <select value={mode} onChange={(e) => setMode(e.target.value as 'operativo' | 'analitico' | 'debug')} className="w-full px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="operativo">Operativo (Recomendado)</option>
                 <option value="analitico">Analítico</option>
@@ -213,15 +259,13 @@ const VideoActionMultiPerson = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Dimensión (Motor IA)</label>
-              <select value={poseMode} onChange={(e) => setPoseMode(e.target.value as '2D' | '3D')} className="w-full px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="2D">2D (YOLOv8 - Multitudes)</option>
-                <option value="3D">3D (MediaPipe - Cercanía)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Salto de frames</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center relative group w-max">
+                Salto de frames
+                <Info className="w-4 h-4 ml-1 text-indigo-500 cursor-pointer" />
+                <div className="absolute bottom-full mb-2 left-0 sm:left-1/2 transform sm:-translate-x-1/2 hidden group-hover:block w-48 bg-gray-800 text-white text-xs rounded-md p-3 shadow-lg z-50 pointer-events-none">
+                  Dicta qué tan rápido procesa el video saltándose fotogramas (ideal para videos largos).
+                </div>
+              </label>
               <select value={framesSkip} onChange={(e) => setFramesSkip(Number(e.target.value))} className="w-full px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value={1}>1 de cada 1</option>
                 <option value={3}>1 de cada 3</option>
@@ -230,7 +274,13 @@ const VideoActionMultiPerson = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Confianza mínima</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center relative group w-max">
+                Confianza mínima
+                <Info className="w-4 h-4 ml-1 text-indigo-500 cursor-pointer" />
+                <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-[80%] sm:-translate-x-1/2 hidden group-hover:block w-48 bg-gray-800 text-white text-xs rounded-md p-3 shadow-lg z-50 pointer-events-none">
+                  Filtro para evitar falsos positivos. Valores más altos son más estrictos.
+                </div>
+              </label>
               <input type="number" min={0.1} max={1} step={0.05} value={confidenceThreshold} onChange={(e) => setConfidenceThreshold(Number(e.target.value))} className="w-full px-3 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500" />
             </div>
           </div>
@@ -262,6 +312,7 @@ const VideoActionMultiPerson = () => {
               <strong>Error:</strong> {errorMessage}
             </div>
           )}
+        </div>
         </div>
       </div>
 
@@ -376,6 +427,15 @@ const VideoActionMultiPerson = () => {
           <div className="bg-gray-50 p-4 rounded-md min-h-[100px] flex items-center justify-center text-gray-500 italic">
             Los resultados del análisis de comportamiento aparecerán aquí cuando finalice el procesamiento.
           </div>
+        )}
+
+        {(analysisResults || analysisReport) && (
+          <details className="mt-6 bg-gray-50 rounded-md border border-gray-200 text-xs text-gray-700">
+            <summary className="p-3 font-semibold cursor-pointer hover:bg-gray-100">Ver JSON completo (Debug)</summary>
+            <div className="p-4 border-t border-gray-200 overflow-auto max-h-64">
+              <pre className="whitespace-pre-wrap">{JSON.stringify(analysisResults || analysisReport, null, 2)}</pre>
+            </div>
+          </details>
         )}
       </div>
     </div>

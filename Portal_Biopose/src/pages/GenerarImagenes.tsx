@@ -8,7 +8,7 @@ import bannerImg from '../assets/Banner_video.png';
 const GenerarImagenes = () => {
   const {
     file, videoUrl, fps, setFps, width, setWidth, height, setHeight,
-    isProcessing, isModalOpen, setIsModalOpen,
+    isProcessing, isDownloading, isModalOpen, setIsModalOpen,
     keypointsData, setKeypointsData, resultsData, fileInputRef,
     handleFileChange, handleGenerateImages, handleReuploadClick,
     handleSaveResults
@@ -270,8 +270,13 @@ const GenerarImagenes = () => {
                                 fill={selectedKp === kp.id ? "#ef4444" : "#0ea5e9"} 
                                 stroke="#ffffff" 
                                 strokeWidth={Math.max(videoSize.w / 1000, 1)} 
-                                className="cursor-pointer hover:fill-yellow-400 transition-colors"
-                                onMouseDown={(e) => { e.stopPropagation(); setDraggedKp(kp.id); setSelectedKp(kp.id); }} 
+                                className={`${isDownloading ? 'cursor-not-allowed' : 'cursor-pointer hover:fill-yellow-400'} transition-colors`}
+                                onMouseDown={(e) => { 
+                                  e.stopPropagation(); 
+                                  if (isDownloading) return;
+                                  setDraggedKp(kp.id); 
+                                  setSelectedKp(kp.id); 
+                                }} 
                               />
                             );
                           }
@@ -337,9 +342,10 @@ const GenerarImagenes = () => {
                   ) : (<div className="bg-red-50 p-4 rounded-xl border border-red-200 text-sm text-red-700 flex items-start shadow-sm"><AlertCircle className="w-5 h-5 mr-3 shrink-0 mt-0.5" /><p>No hay articulaciones visibles.</p></div>)}
 
                   <div className="flex flex-col sm:flex-row gap-3 mt-6 pt-5 border-t border-slate-200 shrink-0">
-                    <button className="flex-1 py-3 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-xl font-bold transition-colors text-sm shadow-sm" onClick={handleReuploadClick}>Descartar y Cerrar</button>
-                    <button className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-md shadow-indigo-200 hover:shadow-lg text-sm flex justify-center items-center" onClick={handleSaveResults}>
-                      <Download className="w-4 h-4 mr-2" /> Descargar Fotogramas (ZIP)
+                    <button className="flex-1 py-3 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-xl font-bold transition-colors text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-100" onClick={handleReuploadClick} disabled={isDownloading}>Descartar y Cerrar</button>
+                    <button className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-md shadow-indigo-200 hover:shadow-lg text-sm flex justify-center items-center disabled:opacity-70 disabled:cursor-not-allowed" onClick={handleSaveResults} disabled={isDownloading}>
+                      {isDownloading ? <Loader className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+                      {isDownloading ? 'Preparando ZIP...' : 'Descargar Fotogramas (ZIP)'}
                     </button>
                   </div>
                 </div>

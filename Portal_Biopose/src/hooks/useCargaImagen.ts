@@ -17,6 +17,9 @@ export const useCargaImagen = () => {
   const [batchResults, setBatchResults] = useState<any[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Referencia para limpieza al cambiar de componente
+  const currentImageIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     const cargarRutas = async () => {
@@ -31,11 +34,23 @@ export const useCargaImagen = () => {
       }
     };
     cargarRutas();
+
+    return () => {
+      // Limpieza pasiva al desmontar si quedó una imagen huérfana
+      if (currentImageIdRef.current) {
+        api.del(`/api/analysis/pose/image/${currentImageIdRef.current}/`).catch(() => {});
+      }
+    };
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
+      if (currentImageIdRef.current) {
+        api.del(`/api/analysis/pose/image/${currentImageIdRef.current}/`).catch(() => {});
+        currentImageIdRef.current = null;
+      }
+      
       setFile(selectedFile);
       const url = URL.createObjectURL(selectedFile);
       setImageUrl(url);
@@ -49,9 +64,21 @@ export const useCargaImagen = () => {
     setIsPreviewModalOpen(true);
   };
 
-  const handleGeneratePose = async () => {
-    if (!file) return;
+  const closePreviewModal = () => {
     setIsPreviewModalOpen(false);
+    
+    // Si se cierra el modal sin añadir al lote, destruimos la imagen
+    if (currentImageIdRef.current) {
+        api.del(`/api/analysis/pose/image/${currentImageIdRef.current}/`).catch(() => {});
+        currentImageIdRef.current = null;
+    }
+    setImageId(null);
+    setPoseResults(null);
+  };
+
+  const handleGeneratePose = async () => {
+
+    if (!file) return;
     setIsProcessing(true);
 
     const fd = new FormData();
@@ -59,14 +86,16 @@ export const useCargaImagen = () => {
 
     try {
       const resUpload = await api.postForm('/api/analysis/media/images/upload/', fd);
-      const uploadedImageId = resUpload?.idImageUpload || resUpload?.detalle?.idImageUpload;
+      const uploadedImageId = resUpload?.idImageUpload || resUpload?.id || resUpload?.image_id;
       
-      if (!uploadedImageId) throw new Error('No se recibió ID de imagen subida');
+      if (!uploadedImageId) throw new Error('No se recibió el ID de la imagen.');
       setImageId(uploadedImageId);
+      currentImageIdRef.current = uploadedImageId;
 
       const resProcess = await api.post(`/api/analysis/pose/image/${uploadedImageId}/process/`, {});
       setPoseResults(resProcess);
       setIsPoseModalOpen(true);
+      setIsPreviewModalOpen(false);
     } catch (error: any) {
       alert(error?.response?.mensaje || 'Error al procesar la imagen');
       console.error(error);
@@ -116,6 +145,8 @@ export const useCargaImagen = () => {
 
       setBatchResults([]); 
       
+      // Limpiar referencia porque fue agregada al lote, ya no es huérfana para borrarla
+      currentImageIdRef.current = null;
     } catch (error: any) {
       console.error("Error al exportar lote a disco:", error);
       alert("Error al intentar descargar el archivo ZIP del lote.");
@@ -131,7 +162,7 @@ export const useCargaImagen = () => {
     
     // Opcional: Intentar borrar la imagen del servidor si la quitan del carrito
     try {
-        await api.del(`/api/analysis/media/images/${itemToRemove.imageId}/`);
+        await api.del(`/api/analysis/pose/image/${itemToRemove.imageId}/`);
     } catch(e) {
         console.warn("No se pudo limpiar la imagen descartada del servidor.");
     }

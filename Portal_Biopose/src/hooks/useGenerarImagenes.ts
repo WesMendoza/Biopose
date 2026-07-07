@@ -11,6 +11,7 @@ export const useGenerarImagenes = () => {
   const [height, setHeight] = useState<number>(300);
   
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -57,11 +58,22 @@ export const useGenerarImagenes = () => {
       } catch (error) { console.error("Error:", error); }
     };
     cargarConfiguracion();
+    
+    return () => {
+      // Limpieza al desmontar
+      if (currentVideoIdRef.current) {
+        api.del(`/api/analysis/media/videos/${currentVideoIdRef.current}/`).catch(() => {});
+      }
+    };
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
+      if (currentVideoIdRef.current) {
+        api.del(`/api/analysis/media/videos/${currentVideoIdRef.current}/`).catch(() => {});
+        currentVideoIdRef.current = null;
+      }
       setFile(selectedFile);
       setVideoUrl(URL.createObjectURL(selectedFile));
       setIsProcessing(false); setKeypointsData([]); setResultsData(null); setErrorMessage(null); setVideoId(null);
@@ -108,7 +120,6 @@ export const useGenerarImagenes = () => {
           const currentStatus = (resStatus?.status || '').toLowerCase();
 
           if (currentStatus === 'completed') {
-            setIsProcessing(false);
             if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
             setResultsData(resStatus.analysis_report || resStatus);
 
@@ -136,6 +147,8 @@ export const useGenerarImagenes = () => {
             } catch (err) { 
                 setErrorMessage("Falló la lectura del archivo JSON en el servidor."); 
                 console.error(err);
+            } finally {
+                setIsProcessing(false);
             }
           } else if (currentStatus === 'failed') {
             setIsProcessing(false);
@@ -164,8 +177,10 @@ export const useGenerarImagenes = () => {
       alert("Faltan datos para descargar la colección de fotogramas.");
       return;
     }
+    
+    setIsDownloading(true);
+    
     try {
-      alert("Preparando el ZIP de descarga... Esto puede tardar unos segundos dependiendo de la cantidad de frames.");
       
       const blob = await api.postBlob(`/api/analysis/videos/${videoId}/save-to-disk/`, {
         fps_usados: fps,
@@ -184,19 +199,19 @@ export const useGenerarImagenes = () => {
       link.parentNode?.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      alert("¡Colección de fotogramas descargada exitosamente!");
-      
       // MAGIA: Ejecutamos la limpieza total tras una descarga exitosa
       handleReuploadClick(); 
     } catch (error: any) {
       console.error("Error al descargar el ZIP:", error);
       alert("Error al intentar descargar los archivos en formato ZIP.");
+    } finally {
+      setIsDownloading(false);
     }
   };
 
   return {
     file, videoUrl, fps, setFps, width, setWidth, height, setHeight,
-    isProcessing, isModalOpen, setIsModalOpen,
+    isProcessing, isDownloading, isModalOpen, setIsModalOpen,
     keypointsData, setKeypointsData, 
     resultsData, errorMessage,
     fileInputRef, handleFileChange, handleGenerateImages, handleReuploadClick, handleSaveResults

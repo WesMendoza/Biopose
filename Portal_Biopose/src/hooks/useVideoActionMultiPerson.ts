@@ -42,35 +42,39 @@ export const useVideoActionMultiPerson = () => {
     return `${API_BASE.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
   };
 
-  const loadKeypointsJson = async () => {
-    if (!currentVideoIdRef.current) return;
+  // Descarga el JSON directamente saltándose la API para evitar errores de serialización
+  const loadKeypointsJson = async (rutaJson?: string) => {
+    if (!rutaJson) return;
+    
     try {
-      const res = await api.get(`/api/analysis/videos/${currentVideoIdRef.current}/keypoints-json/`);
+      const timestamp = new Date().getTime();
+      const cleanPath = rutaJson.replace(/^\//, '');
+      const fileUrl = resolveUrl(`media/${cleanPath}?t=${timestamp}`);
       
-      let payload = res.keypoints || {};
-      if (typeof payload === 'string') {
-        try { payload = JSON.parse(payload); } catch (e) {}
-      }
+      const response = await fetch(fileUrl);
+      if (!response.ok) throw new Error(`El archivo físico no se encontró`);
+      
+      const rawData = await response.json();
 
       let kps = [];
       let dets = [];
 
-      if (Array.isArray(payload)) {
-          kps = payload; 
-      } else if (payload && typeof payload === 'object') {
-          kps = payload.frames || payload.keypoints || payload.frames_data || [];
-          dets = payload.detections || payload.eventos || [];
-          
-          if (kps.length === 0 && dets.length === 0) {
-            setErrorMessage(`[DEBUG] JSON vacío. Keys detectadas: ${Object.keys(payload).join(', ')}`);
-          }
+      if (Array.isArray(rawData)) {
+          kps = rawData; 
+      } else if (rawData && typeof rawData === 'object') {
+          kps = rawData.frames || rawData.keypoints || rawData.frames_data || [];
+          dets = rawData.detections || rawData.eventos || [];
+      }
+      
+      if (kps.length === 0 && dets.length === 0) {
+          console.warn('[DEBUG] El JSON fue descargado pero está vacío (no hay frames ni detecciones).');
       }
       
       setKeypointsData(kps);
       setDetailedDetections(dets); 
-      setJsonKeypointsUrl(res.ruta_json_keypoints || null);
+      setJsonKeypointsUrl(rutaJson);
     } catch (error: any) {
-      console.warn('Error descargando JSON desde API:', error);
+      console.warn('Error descargando JSON desde URL física:', error);
       setErrorMessage(`No se pudo cargar los datos del análisis: ${error.message}`);
     }
   };
@@ -78,6 +82,10 @@ export const useVideoActionMultiPerson = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
+      if (currentVideoIdRef.current) {
+        api.del(`/api/analysis/media/videos/${currentVideoIdRef.current}/`).catch(() => {});
+        currentVideoIdRef.current = null;
+      }
       setFile(selectedFile);
       setVideoUrl(URL.createObjectURL(selectedFile));
       setIsProcessing(false);
@@ -132,9 +140,6 @@ export const useVideoActionMultiPerson = () => {
           if (resStatus?.status === 'completed') {
             window.clearInterval(intervalId);
             setProgress(100);
-            setIsProcessing(false);
-            setAnalysisResults(resStatus);
-            setAnalysisReport(resStatus.analysis_report || null);
 
             // =================================================================
             // RASTREADOR 2: Resultado recibido
@@ -144,8 +149,13 @@ export const useVideoActionMultiPerson = () => {
             const streamUrl = resStatus.stream_url || resStatus.video_url || resStatus.download_url || resStatus.rutaVideoProcesado || resStatus.rutaArchivoProcesado || null;
             if (streamUrl) setDownloadUrl(resolveUrl(streamUrl));
 
-            await loadKeypointsJson();
+            const rutaJson = resStatus.ruta_json_keypoints || resStatus.analysis_report?.rutaJsonKeypoints;
+            await loadKeypointsJson(rutaJson);
             
+            // Actualizamos la UI al final para que aparezca todo de forma instantánea
+            setAnalysisReport(resStatus.analysis_report || null);
+            setAnalysisResults(resStatus);
+            setIsProcessing(false);
           } else if (resStatus?.status === 'processing') {
             setProgress((prev) => (prev < 90 ? prev + 5 : 90));
           } else if (resStatus?.status === 'failed') {
