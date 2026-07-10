@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Upload, Settings, RefreshCw, CheckCircle, AlertTriangle, CloudUpload, Loader, Image as ImageIcon, X, ChevronLeft, ChevronRight, Download, ZoomOut, ZoomIn, Maximize, User, Info, AlertCircle } from 'lucide-react';
 import { useGenerarImagenes } from '../hooks/useGenerarImagenes';
-import { KEYPOINT_NAMES, POSE_CONNECTIONS } from '../utils/ai-visuals'; 
+import { KEYPOINT_NAMES } from '../utils/ai-visuals';
+import { SkeletonSvgOverlay } from '../components/SkeletonSvgOverlay'; 
 import videoGif from '../assets/video.gif';
 import bannerImg from '../assets/Banner_video.png';
 
@@ -246,49 +247,17 @@ const GenerarImagenes = () => {
                     <div className="relative w-full h-full flex items-center justify-center" style={{ maxHeight: '85vh' }}>
                       <canvas ref={displayCanvasRef} className="block max-w-none shadow-2xl rounded-sm pointer-events-none select-none" />
                       
-                      <svg 
-                        ref={svgRef}
-                        viewBox={`0 0 ${videoSize.w} ${videoSize.h}`} 
-                        className="absolute inset-0 w-full h-full"
-                      >
-                        {POSE_CONNECTIONS.map((connection, idx) => {
-                          const kp1 = validKeypoints.find((k: any) => k.id === connection.pair[0]);
-                          const kp2 = validKeypoints.find((k: any) => k.id === connection.pair[1]);
-                          if (kp1?.confidence !== undefined && kp1.confidence >= 0 && kp2?.confidence !== undefined && kp2.confidence >= 0) {
-                            return <line key={`bone-${idx}`} x1={kp1.x * scaleX} y1={kp1.y * scaleY} x2={kp2.x * scaleX} y2={kp2.y * scaleY} stroke={connection.color} strokeWidth={Math.max(videoSize.w / 300, 2)} strokeOpacity="0.85" />;
-                          }
-                          return null;
-                        })}
-
-                        {validKeypoints.map((kp: any) => {
-                          if (kp.confidence !== undefined && kp.confidence >= 0) {
-                            return (
-                              <circle 
-                                key={`joint-${kp.id}`} 
-                                cx={kp.x * scaleX} cy={kp.y * scaleY} 
-                                r={Math.max(videoSize.w / 1000, 1.5)} 
-                                fill={selectedKp === kp.id ? "#ef4444" : "#0ea5e9"} 
-                                stroke="#ffffff" 
-                                strokeWidth={Math.max(videoSize.w / 1000, 1)} 
-                                className={`${isDownloading ? 'cursor-not-allowed' : 'cursor-pointer hover:fill-yellow-400'} transition-colors`}
-                                onMouseDown={(e) => { 
-                                  e.stopPropagation(); 
-                                  if (isDownloading) return;
-                                  setDraggedKp(kp.id); 
-                                  setSelectedKp(kp.id); 
-                                }} 
-                              />
-                            );
-                          }
-                          return null;
-                        })}
-
-                        {selectedKp !== null && validKeypoints.filter((k: any) => k.id === selectedKp).map((kp: any) => (
-                          <g key={`radar-${kp.id}`}>
-                            <circle cx={kp.x * scaleX} cy={kp.y * scaleY} r={Math.max(videoSize.w / 40, 15)} className="animate-ping origin-center" fill="none" stroke="#ef4444" strokeWidth={Math.max(videoSize.w / 200, 2)} />
-                          </g>
-                        ))}
-                      </svg>
+                      <SkeletonSvgOverlay 
+                        keypoints={validKeypoints}
+                        naturalSize={videoSize}
+                        selectedKp={selectedKp}
+                        onKpMouseDown={(id) => {
+                          if (isDownloading) return;
+                          setDraggedKp(id);
+                          setSelectedKp(id);
+                        }}
+                        getRealCoords={(x, y) => ({ x: x * scaleX, y: y * scaleY })}
+                      />
                     </div>
                   )}
                 </div>

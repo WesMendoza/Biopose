@@ -105,22 +105,22 @@ const LiveActionMultiPerson = () => {
             <select
               value={operationMode}
               onChange={(e) => setOperationMode(e.target.value)}
-              disabled={isStreaming}
+              title="Seleccione el modo de visualización de la IA en pantalla"
               className="px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             >
-              <option value="Modo Operativo (Por defecto)">Modo Operativo (Por defecto)</option>
-              <option value="Modo Analítico (Esqueletos)">Modo Analítico (Esqueletos)</option>
-              <option value="Modo Debug (Tracking)">Modo Debug (Tracking)</option>
+              <option value="Modo Operativo (Por defecto)" title="Vista limpia para producción: Muestra únicamente los recuadros de estado (Verde, Naranja, Rojo) y oculta el mapa óseo.">Modo Operativo (Por defecto)</option>
+              <option value="Modo Analítico (Esqueletos)" title="Vista para pruebas: Dibuja las conexiones de los 17 puntos articulares sobre cada persona detectada para visualizar cómo la IA percibe los cuerpos.">Modo Analítico (Esqueletos)</option>
+              <option value="Modo Debug (Tracking)" title="Vista de desarrollador: Muestra los esqueletos y procesa información extra de tracking en la consola del backend.">Modo Debug (Tracking)</option>
             </select>
 
             <select
               value={poseMode}
               onChange={(e) => setPoseMode(e.target.value as '2D' | '3D')}
-              disabled={isStreaming}
+              title="Seleccione el motor de estimación postural a utilizar"
               className="px-3 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
             >
-              <option value="2D">Estimación postural: 2D</option>
-              <option value="3D">Estimación postural: 3D</option>
+              <option value="2D" title="Usa YOLOv8: Excelente rendimiento para múltiples personas a larga distancia. (Recomendado)">Estimación postural: 2D</option>
+              <option value="3D" title="Usa MediaPipe: Mayor precisión en articulaciones pero requiere más poder de cómputo y que las personas estén de cuerpo completo.">Estimación postural: 3D</option>
             </select>
 
             <button

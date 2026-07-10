@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle, CloudUpload, Download, Loader, RefreshCw, I
 import policeImg from '../assets/police.jpg';
 import angryPoliceImg from '../assets/angry_police.jpg';
 import { useVideoActionMultiPerson } from '../hooks/useVideoActionMultiPerson';
+import { drawPersonVisuals } from '../utils/ai-visuals';
 
 // DICCIONARIO PARA COMPORTAMIENTOS MULTIPERSONA
 const MULTIPERSON_LABELS: Record<string, { label: string, color: string }> = {
@@ -90,91 +91,7 @@ const VideoActionMultiPerson = () => {
 
     // DIBUJAR A TODAS LAS PERSONAS DETECTADAS EN LA PANTALLA
     currentFrame.persons.forEach((personData: any) => {
-      const personPoints = personData.keypoints_json || personData.keypoints;
-      if (!Array.isArray(personPoints)) return;
-      const pid = personData.person_id;
-
-      // Evaluar en qué evento está participando ESTA persona específicamente
-      const personEvents = activeEvents.filter((e: any) => {
-        const pids = e.detalles?.pids || (e.detalles?.pid !== undefined ? [e.detalles.pid] : []);
-        // Si el backend no envió pids o si está incluido, aplicamos el evento (fallback)
-        return pids.length === 0 || pids.includes(pid);
-      });
-
-      const isPeleando = personEvents.some((e: any) => (e.tipo_evento || '').toLowerCase().includes('pelea'));
-      const isDisturbio = personEvents.some((e: any) => (e.tipo_evento || '').toLowerCase().includes('disturbio') || (e.tipo_evento || '').toLowerCase().includes('altercado'));
-
-      let boxColor = 'rgba(34, 197, 94, 1)'; // Verde (Neutral)
-      let boxBgColor = 'transparent';
-      let skeletonColor = 'rgba(34, 197, 94, 0.8)'; // Verde
-      let pointColor = 'rgba(34, 197, 94, 1)'; // Verde
-
-      if (isPeleando) {
-        boxColor = 'rgba(239, 68, 68, 1)'; // Rojo
-        boxBgColor = 'rgba(239, 68, 68, 0.2)';
-        skeletonColor = 'rgba(239, 68, 68, 0.8)';
-        pointColor = 'rgba(255, 255, 255, 1)';
-      } else if (isDisturbio) {
-        boxColor = 'rgba(249, 115, 22, 1)'; // Naranja
-        boxBgColor = 'rgba(249, 115, 22, 0.2)';
-        skeletonColor = 'rgba(249, 115, 22, 0.8)';
-        pointColor = 'rgba(255, 255, 255, 1)';
-      }
-
-      let minX = Infinity, minY = Infinity, maxX = 0, maxY = 0;
-
-      const skeletonConnections = [
-        [5, 7], [7, 9], [6, 8], [8, 10], [11, 13], [13, 15], [12, 14], [14, 16], 
-        [5, 6], [11, 12], [5, 11], [6, 12], [0, 1], [0, 2], [1, 3], [2, 4] 
-      ];
-
-      ctx.strokeStyle = skeletonColor;
-      ctx.lineWidth = Math.max(video.videoWidth / 300, 2); 
-
-      skeletonConnections.forEach(([p1, p2]) => {
-        const pt1 = personPoints.find((p: any) => (p.id !== undefined ? p.id : p.name) === p1 || p.id === p1);
-        const pt2 = personPoints.find((p: any) => (p.id !== undefined ? p.id : p.name) === p2 || p.id === p2);
-        
-        const pt1Conf = pt1?.confidence ?? 1.0;
-        const pt2Conf = pt2?.confidence ?? 1.0;
-
-        if (pt1 && pt2 && pt1Conf > 0.4 && pt2Conf > 0.4) {
-          ctx.beginPath();
-          ctx.moveTo(pt1.x * scaleX, pt1.y * scaleY);
-          ctx.lineTo(pt2.x * scaleX, pt2.y * scaleY);
-          ctx.stroke();
-        }
-      });
-
-      personPoints.forEach((point: any) => {
-        const conf = point.confidence ?? 1.0;
-        if (conf > 0.4) {
-          const px = point.x * scaleX;
-          const py = point.y * scaleY;
-          if (px < minX) minX = px;
-          if (py < minY) minY = py;
-          if (px > maxX) maxX = px;
-          if (py > maxY) maxY = py;
-
-          ctx.beginPath();
-          ctx.arc(px, py, Math.max(video.videoWidth / 250, 3), 0, 2 * Math.PI);
-          ctx.fillStyle = pointColor;
-          ctx.fill();
-          ctx.strokeStyle = boxColor;
-          ctx.lineWidth = Math.max(video.videoWidth / 500, 1);
-          ctx.stroke();
-        }
-      });
-
-      // Dibujar caja contenedora
-      if (minX < Infinity && maxX > 0) {
-        const padding = 20; 
-        ctx.strokeStyle = boxColor;
-        ctx.lineWidth = 3;
-        ctx.fillStyle = boxBgColor;
-        ctx.fillRect(minX - padding, minY - padding, (maxX - minX) + padding * 2, (maxY - minY) + padding * 2);
-        ctx.strokeRect(minX - padding, minY - padding, (maxX - minX) + padding * 2, (maxY - minY) + padding * 2);
-      }
+      drawPersonVisuals(ctx, personData, activeEvents, scaleX, scaleY, video.videoWidth);
     });
 
     // MARCA DE ALERTA GLOBAL EN LA ESQUINA (Dinámico y apilable)

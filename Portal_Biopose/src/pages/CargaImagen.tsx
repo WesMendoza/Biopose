@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { CheckCircle, CloudUpload, Image as ImageIcon, Loader, Settings, X, ZoomIn, ZoomOut, Maximize, AlertCircle, User, Info, Download, Trash2, PlusCircle } from 'lucide-react';
 import { useCargaImagen } from '../hooks/useCargaImagen';
-import { KEYPOINT_NAMES, POSE_CONNECTIONS } from '../utils/ai-visuals';
+import { KEYPOINT_NAMES } from '../utils/ai-visuals';
+import { SkeletonSvgOverlay } from '../components/SkeletonSvgOverlay';
 import uploadGif from '../assets/upload.gif';
 import bannerImg from '../assets/banner.png';
 
@@ -237,32 +238,15 @@ const CargaImagen = () => {
                   />
 
                   {naturalSize.w > 0 && validKeypoints.length > 0 && (
-                    <svg ref={svgRef} viewBox={`0 0 ${naturalSize.w} ${naturalSize.h}`} className="absolute inset-0 w-full h-full">
-                      {POSE_CONNECTIONS.map((connection, idx) => {
-                        const kp1 = validKeypoints.find((k: any) => k.id === connection.pair[0]);
-                        const kp2 = validKeypoints.find((k: any) => k.id === connection.pair[1]);
-                        if (kp1 && kp2) {
-                          // Grosor de línea más fino
-                          return (<line key={`bone-${idx}`} x1={kp1.x} y1={kp1.y} x2={kp2.x} y2={kp2.y} stroke={connection.color} strokeWidth={Math.max(naturalSize.w / 600, 1)} strokeOpacity="0.85" />);
-                        }
-                        return null;
-                      })}
-
-                      {validKeypoints.map((kp: any) => (
-                        <circle
-                          key={`joint-${kp.id}`}
-                          cx={kp.x} cy={kp.y}
-                          // Radio del círculo súper pequeño (divisor de 1000)
-                          r={Math.max(naturalSize.w / 1000, 1.5)}
-                          fill={selectedKp === kp.id ? "#ef4444" : "#0ea5e9"} // Rojo si está seleccionado, Azul vivo por defecto
-                          stroke="#ffffff"
-                          // Borde blanco minúsculo
-                          strokeWidth={Math.max(naturalSize.w / 1000, 1)}
-                          className="cursor-pointer hover:fill-yellow-400 transition-colors"
-                          onMouseDown={(e) => { e.stopPropagation(); setDraggedKp(kp.id); setSelectedKp(kp.id); }}
-                        />
-                      ))}
-                    </svg>
+                    <SkeletonSvgOverlay 
+                      keypoints={validKeypoints}
+                      naturalSize={naturalSize}
+                      selectedKp={selectedKp}
+                      onKpMouseDown={(id) => {
+                        setDraggedKp(id);
+                        setSelectedKp(id);
+                      }}
+                    />
                   )}
                 </div>
               </div>

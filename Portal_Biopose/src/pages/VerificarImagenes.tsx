@@ -2,7 +2,8 @@ import React, { useState, useRef } from 'react';
 import { Search, AlertCircle, Image as ImageIcon, ZoomIn, ZoomOut, Maximize, User, Info, Loader, FolderOpen } from 'lucide-react';
 import { useVerificarImagenes } from '../hooks/useVerificarImagenes';
 // IMPORTAMOS LA CONFIGURACIÓN CENTRALIZADA
-import { KEYPOINT_NAMES, POSE_CONNECTIONS } from '../utils/ai-visuals';
+import { KEYPOINT_NAMES } from '../utils/ai-visuals';
+import { SkeletonSvgOverlay } from '../components/SkeletonSvgOverlay';
 
 const VerificarImagenes = () => {
   const {
@@ -20,7 +21,6 @@ const VerificarImagenes = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const svgRef = useRef<SVGSVGElement>(null);
-  const [draggedKp, setDraggedKp] = useState<number | null>(null);
 
   const handleResetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
   
@@ -30,39 +30,6 @@ const VerificarImagenes = () => {
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    // === LÓGICA DE ARRASTRE Y CONFIANZA AL 100% ===
-    if (draggedKp !== null && svgRef.current) {
-      e.stopPropagation();
-      const svg = svgRef.current as any;
-      const CTM = svg.getScreenCTM();
-      if (!CTM) return;
-      const pt = svg.createSVGPoint();
-      pt.x = e.clientX; pt.y = e.clientY;
-      const svgP = pt.matrixTransform(CTM.inverse());
-      
-      setPoseResults((prev: any) => {
-        const newRes = { ...prev };
-        const person = newRes.persons[selectedPersonIndex];
-        const kpIndex = person.keypoints.findIndex((k: any) => k.id === draggedKp);
-        if (kpIndex > -1) {
-          // Desnormalizamos las coordenadas si es un video
-          if (isVideo && !isNormalized) {
-            const YOLO_RESOLUTION = 640; 
-            const scaleX = naturalSize.w / YOLO_RESOLUTION;
-            const scaleY = naturalSize.h / YOLO_RESOLUTION;
-            person.keypoints[kpIndex].x = svgP.x / scaleX;
-            person.keypoints[kpIndex].y = svgP.y / scaleY;
-          } else {
-            person.keypoints[kpIndex].x = svgP.x;
-            person.keypoints[kpIndex].y = svgP.y;
-          }
-          // ¡Confirmación humana al 100%!
-          person.keypoints[kpIndex].confidence = 1.0;
-        }
-        return newRes;
-      });
-      return;
-    }
 
     if (!isDragging) return;
     setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
@@ -70,7 +37,6 @@ const VerificarImagenes = () => {
 
   const handleMouseUp = () => {
     setIsDragging(false);
-    setDraggedKp(null);
   };
 
   const currentPerson = poseResults?.persons?.[selectedPersonIndex];
@@ -171,8 +137,8 @@ const VerificarImagenes = () => {
               className="relative origin-center inline-block"
               style={{ 
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                cursor: draggedKp ? 'grabbing' : (zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'),
-                transitionProperty: 'transform', transitionDuration: isDragging || draggedKp ? '0ms' : '200ms', transitionTimingFunction: 'ease-out'
+                cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+                transitionProperty: 'transform', transitionDuration: isDragging ? '0ms' : '200ms', transitionTimingFunction: 'ease-out'
               }}
             >
               <img 
@@ -184,38 +150,13 @@ const VerificarImagenes = () => {
               />
 
               {naturalSize.w > 0 && poseResults && validKeypoints.length > 0 && (
-                <svg ref={svgRef} viewBox={`0 0 ${naturalSize.w} ${naturalSize.h}`} className="absolute inset-0 w-full h-full">
-                  {/* LÍNEAS DE COLORES */}
-                  {POSE_CONNECTIONS.map((connection, idx) => {
-                    const kp1 = validKeypoints.find((k: any) => k.id === connection.pair[0]);
-                    const kp2 = validKeypoints.find((k: any) => k.id === connection.pair[1]);
-                    if (kp1 && kp2) {
-                      const p1 = getRealCoords(kp1.x, kp1.y);
-                      const p2 = getRealCoords(kp2.x, kp2.y);
-                      return <line key={`bone-${idx}`} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={connection.color} strokeWidth={Math.max(naturalSize.w / 600, 1)} strokeOpacity="0.85" />;
-                    }
-                    return null;
-                  })}
-                  {/* PUNTOS REDUCIDOS DE TAMAÑO */}
-                  {validKeypoints.map((kp: any) => {
-                    const p = getRealCoords(kp.x, kp.y);
-                    return (
-                      <circle 
-                        key={`joint-${kp.id}`} cx={p.x} cy={p.y} 
-                        r={Math.max(naturalSize.w / 1000, 1.5)} 
-                        fill={selectedKp === kp.id ? "#ef4444" : "#0ea5e9"} 
-                        stroke="#ffffff" strokeWidth={Math.max(naturalSize.w / 1000, 1)} 
-                        className="cursor-pointer hover:fill-yellow-400 transition-colors"
-                        onMouseDown={(e) => { e.stopPropagation(); setDraggedKp(kp.id); setSelectedKp(kp.id); }}
-                      />
-                    );
-                  })}
-                  {/* RADAR */}
-                  {selectedKp !== null && validKeypoints.filter((k: any) => k.id === selectedKp).map((kp: any) => {
-                    const p = getRealCoords(kp.x, kp.y);
-                    return <circle key={`radar-${kp.id}`} cx={p.x} cy={p.y} r={Math.max(naturalSize.w / 40, 15)} className="animate-ping origin-center" fill="none" stroke="#ef4444" strokeWidth={Math.max(naturalSize.w / 300, 2)} />;
-                  })}
-                </svg>
+                <SkeletonSvgOverlay 
+                  keypoints={validKeypoints}
+                  naturalSize={naturalSize}
+                  selectedKp={selectedKp}
+                  onKpClick={(id) => setSelectedKp(id)}
+                  getRealCoords={getRealCoords}
+                />
               )}
             </div>
           </div>
@@ -241,7 +182,7 @@ const VerificarImagenes = () => {
                   <div className="mt-3 p-3 bg-blue-50/80 border border-blue-100 rounded-lg flex items-start shadow-sm">
                     <Info className="w-4 h-4 text-blue-500 mr-2 shrink-0 mt-0.5" />
                     <p className="text-xs text-blue-700 leading-relaxed">
-                      <strong>Nota:</strong> El valor de la confianza proviene del análisis inicial de la IA y no cambia aunque se modifiquen las coordenadas manualmente.
+                      <strong>Nota:</strong> Esta pantalla es de modo solo lectura. Las coordenadas y su confianza son los resultados estáticos de la IA extraídos del Dataset local.
                     </p>
                   </div>
                 </div>

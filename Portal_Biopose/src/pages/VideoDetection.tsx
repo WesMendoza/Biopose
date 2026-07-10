@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import policeImg from '../assets/police.jpg';
 import angryPoliceImg from '../assets/angry_police.jpg';
 import { useVideoDetection } from '../hooks/useVideoDetection';
+import { drawSkeletonVisuals } from '../utils/ai-visuals';
 
 // DICCIONARIO EXCLUSIVO PARA COMPORTAMIENTOS SOSPECHOSOS
 const BEHAVIOR_LABELS: Record<string, { label: string, color: string }> = {
@@ -143,43 +144,10 @@ const VideoDetection = () => {
     currentDetections.forEach((frame: any) => {
       const personsList = frame.persons || [frame]; // Fallback if it's the old format
       
-      personsList.forEach((person: any) => {
-        const points = person.keypoints_json || person.keypoints;
-        if (!points) return;
-
-        const skeletonConnections = [
-          [5, 7], [7, 9], [6, 8], [8, 10], 
-          [11, 13], [13, 15], [12, 14], [14, 16], 
-          [5, 6], [11, 12], [5, 11], [6, 12], 
-          [0, 1], [0, 2], [1, 3], [2, 4] 
-        ];
-
-        ctx.strokeStyle = 'rgba(16, 185, 129, 0.8)'; 
-        ctx.lineWidth = Math.max(video.videoWidth / 300, 2); 
-
-        skeletonConnections.forEach(([p1, p2]) => {
-          const pt1 = points.find((p: any) => p.id === p1);
-          const pt2 = points.find((p: any) => p.id === p2);
-          
-          if (pt1 && pt2 && pt1.confidence > 0.4 && pt2.confidence > 0.4) {
-            ctx.beginPath();
-            ctx.moveTo(pt1.x * scaleX, pt1.y * scaleY);
-            ctx.lineTo(pt2.x * scaleX, pt2.y * scaleY);
-            ctx.stroke();
-          }
-        });
-
-        points.forEach((point: any) => {
-          if (point.confidence > 0.4) {
-            ctx.beginPath();
-            ctx.arc(point.x * scaleX, point.y * scaleY, Math.max(video.videoWidth / 250, 3), 0, 2 * Math.PI);
-            ctx.fillStyle = 'rgba(239, 68, 68, 1)';
-            ctx.fill();
-            ctx.strokeStyle = 'white';
-            ctx.lineWidth = Math.max(video.videoWidth / 500, 1);
-            ctx.stroke();
-          }
-        });
+      personsList.forEach((personData: any) => {
+        const points = personData.keypoints_json || personData.keypoints;
+        if (!Array.isArray(points)) return;
+        drawSkeletonVisuals(ctx, points, scaleX, scaleY, video.videoWidth);
       });
     });
   };
