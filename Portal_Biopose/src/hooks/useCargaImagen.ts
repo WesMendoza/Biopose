@@ -120,6 +120,9 @@ export const useCargaImagen = () => {
     setImageUrl(null);
     setPoseResults(null);
     setImageId(null);
+    
+    // Clear the reference so it doesn't get deleted when selecting the next file
+    currentImageIdRef.current = null;
   };
 
   // === DESCARGAR TODO EL LOTE ===
