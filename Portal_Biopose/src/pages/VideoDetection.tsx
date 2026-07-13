@@ -1,62 +1,184 @@
-import React, { useState, useRef } from 'react';
-import { Upload, Settings, RefreshCw, CheckCircle, AlertTriangle, CloudUpload, Loader } from 'lucide-react';
+import { AlertTriangle, CheckCircle, CloudUpload, Download, Loader, RefreshCw, Info } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import policeImg from '../assets/police.jpg';
+import angryPoliceImg from '../assets/angry_police.jpg';
+import { useVideoDetection } from '../hooks/useVideoDetection';
+import { drawSkeletonVisuals } from '../utils/ai-visuals';
+
+// DICCIONARIO EXCLUSIVO PARA COMPORTAMIENTOS SOSPECHOSOS
+const BEHAVIOR_LABELS: Record<string, { label: string, color: string }> = {
+  // Nombres en inglés (por si acaso el backend los manda crudos)
+  'excessive_gaze': { label: 'Mirada excesiva', color: 'bg-orange-100 text-orange-700 border-orange-200' },
+  'hidden_hands': { label: 'Manos ocultas detrás', color: 'bg-red-100 text-red-700 border-red-200' },
+  'hand_under_clothes': { label: 'Mano bajo ropa', color: 'bg-purple-100 text-purple-700 border-purple-200' },
+  
+  // Nombres en español (que el backend está enviando en el JSON crudo)
+  'Mirada Excesiva': { label: 'Mirada excesiva', color: 'bg-orange-100 text-orange-700 border-orange-200' },
+  'Manos ocultas detrás': { label: 'Manos ocultas', color: 'bg-red-100 text-red-700 border-red-200' },
+  'Mano en el bolsillo o bajo ropa': { label: 'Mano bajo ropa', color: 'bg-purple-100 text-purple-700 border-purple-200' },
+};
 
 const VideoDetection = () => {
-  const [file, setFile] = useState<File | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [framesSkip, setFramesSkip] = useState(3);
-  const [poseMode, setPoseMode] = useState<'2D' | '3D'>('2D');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const {
+    file,
+    videoUrl,
+    isProcessing,
+    progress,
+    mode,
+    setMode,
+    framesSkip,
+    setFramesSkip,
+    poseMode,
+    setPoseMode,
+    confidenceThreshold,
+    setConfidenceThreshold,
+    analysisResults,
+    analysisReport,
+    keypointsData,
+    detailedDetections,
+    errorMessage,
+    downloadUrl,
+    fileInputRef,
+    handleFileChange,
+    handleProcessVideo,
+    handleReuploadClick,
+  } = useVideoDetection();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-      const url = URL.createObjectURL(selectedFile);
-      setVideoUrl(url);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isHostile, setIsHostile] = useState(false);
+
+  // Cuando se limpia el video o no hay resultados, reseteamos la alerta
+  useEffect(() => {
+    if (!videoUrl || !analysisResults) {
+      setIsHostile(false);
     }
-  };
+  }, [videoUrl, analysisResults]);
 
-  const handleProcessVideo = () => {
-    if (!file) return;
-    setIsProcessing(true);
-    setProgress(0);
-    
-    // Simulate processing
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsProcessing(false);
-          return 100;
+  // FILTRO: Validamos ambos idiomas
+  const allowedBehaviors = [
+    'excessive_gaze', 'hidden_hands', 'hand_under_clothes',
+    'Mirada Excesiva', 'Manos ocultas detrás', 'Mano en el bolsillo o bajo ropa'
+  ];
+  
+  // Normalizamos las propiedades igual que en Multipersona por si el backend cambia la estructura
+  const normalizedDetections = (detailedDetections || []).map((det: any) => ({
+    ...det,
+    tipo_evento: det.tipo_evento ?? det.label ?? det.behavior ?? det.tipo ?? 'UNKNOWN',
+    segundo_inicio: det.segundo_inicio ?? det.inicio_segundo ?? det.start_time ?? 0,
+    segundo_fin: det.segundo_fin ?? det.fin_segundo ?? det.end_time ?? 0,
+    confianza: det.confianza ?? det.precision_maxima ?? det.confidence ?? 0,
+  }));
+
+  const filteredDetections = normalizedDetections.filter((det: any) =>
+    allowedBehaviors.includes(det.tipo_evento)
+  );
+
+// 1. Obtiene las detecciones exactas para el segundo actual del video
+  const getClosestDetections = () => {
+    if (!videoRef.current) return [];
+
+    // BLINDAJE: Si keypointsData es nulo, indefinido, o no es un arreglo, regresamos vacío
+    if (!keypointsData || !Array.isArray(keypointsData)) {
+      return [];
+    }
+
+    const currentTime = videoRef.current.currentTime;
+    let minDiff = Infinity;
+    let closestTime = -1;
+
+    // Buscar el timestamp_sec del JSON que más se acerque al tiempo actual del video
+    for (const frame of keypointsData) {
+      if (frame && frame.timestamp_sec !== undefined) {
+        const diff = Math.abs(frame.timestamp_sec - currentTime);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestTime = frame.timestamp_sec;
         }
-        return prev + 5;
-      });
-    }, 500);
+      }
+    }
+
+    // Si el video saltó mucho o se desincronizó por más de 0.5s, no dibujamos
+    if (minDiff > 0.5) return [];
+
+    // Retorna todos los registros (personas) que coincidan con ese tiempo
+    return keypointsData.filter((frame: any) => frame.timestamp_sec === closestTime);
   };
 
-  const handleReuploadClick = () => {
-    setFile(null);
-    setVideoUrl(null);
-    setIsProcessing(false);
-    setProgress(0);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+  // 2. Dibuja los puntos y líneas sobre el canvas transparente
+  const drawOverlay = () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || !keypointsData) return;
+
+    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
     }
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!video.videoWidth || !video.videoHeight) return;
+
+    const currentDetections = getClosestDetections();
+
+    let isNormalized = false;
+    const firstPerson = currentDetections[0]?.persons?.[0] || currentDetections[0];
+    const firstPoints = firstPerson?.keypoints_json || firstPerson?.keypoints;
+    if (firstPoints && firstPoints.length > 0) {
+      isNormalized = firstPoints.every((p: any) => p.x <= 1.5 && p.y <= 1.5);
+    }
+
+    const scaleX = isNormalized ? video.videoWidth : (video.videoWidth / 640);
+    const scaleY = isNormalized ? video.videoHeight : (video.videoHeight / 640);
+
+    const currentTime = video.currentTime;
+    const activeEvent = filteredDetections.find((det: any) => 
+      currentTime >= det.segundo_inicio && currentTime <= ((det.segundo_fin || det.segundo_inicio) + 2.0)
+    );
+    const currentlyHostile = !!activeEvent;
+    setIsHostile(currentlyHostile);
+
+    currentDetections.forEach((frame: any) => {
+      const personsList = frame.persons || [frame]; // Fallback if it's the old format
+      
+      personsList.forEach((personData: any) => {
+        const points = personData.keypoints_json || personData.keypoints;
+        if (!Array.isArray(points)) return;
+        drawSkeletonVisuals(ctx, points, scaleX, scaleY, video.videoWidth);
+      });
+    });
   };
+
+  useEffect(() => {
+    if (!keypointsData) {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      return;
+    }
+    drawOverlay();
+  }, [keypointsData]);
+
+  const shouldShowResult = !!analysisResults || !!analysisReport;
+  const totalFrames = analysisResults?.total_frames ?? analysisReport?.totalFrames;
+  const durationSeconds = analysisResults?.duration_seconds ?? analysisReport?.totalDuracionSegundos;
+  const processingSeconds = analysisResults?.processing_time_seconds ?? analysisReport?.tiempoProcesamientoSegundos;
+  const averageConfidence = analysisResults?.analysis_report?.average_confidence ?? analysisReport?.confianzaPromedio;
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Detección de Comportamientos Sospechosos</h1>
+      <div className="w-full mb-8">
+        <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100">
+          <h4 className="text-lg font-semibold text-gray-700 mb-2">Cargar Video para Análisis</h4>
+          <p className="text-gray-500 mb-6 text-sm">El sistema analizará el video en busca de comportamientos sospechosos.</p>
 
-      {/* Control Panel */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-8 border border-gray-100">
-        <h4 className="text-lg font-semibold text-gray-700 mb-2">Cargar Video para Análisis</h4>
-        <p className="text-gray-500 mb-6 text-sm">El sistema analizará el video en busca de comportamientos sospechosos.</p>
-
-        <div className="space-y-4">
+          <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Seleccionar archivo de video:
@@ -75,6 +197,92 @@ const VideoDetection = () => {
             />
           </div>
 
+          <div className="grid gap-3 lg:grid-cols-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center relative group w-max">
+                Modo de procesamiento
+                <Info className="w-4 h-4 ml-1 text-indigo-500 cursor-pointer" />
+                <div className="absolute bottom-full mb-2 left-0 sm:left-1/2 transform sm:-translate-x-1/2 hidden group-hover:block w-72 bg-gray-800 text-white text-xs rounded-md p-3 shadow-lg z-50 pointer-events-none">
+                  <ul className="space-y-2">
+                    <li><span className="font-semibold text-indigo-300">Operativo:</span> Prioriza velocidad. Aplica salto de frames y usa sustracción de fondo.</li>
+                    <li><span className="font-semibold text-indigo-300">Analítico:</span> Prioriza precisión. Ignora salto de frames pero omite pausas estáticas.</li>
+                    <li><span className="font-semibold text-indigo-300">Debug:</span> Análisis exhaustivo. Desactiva sustracción de fondo, procesa todo lentamente.</li>
+                  </ul>
+                </div>
+              </label>
+              <select
+                value={mode}
+                onChange={(e) => setMode(e.target.value as 'operativo' | 'analitico' | 'debug')}
+                className="w-full px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="operativo">Operativo</option>
+                <option value="analitico">Analítico</option>
+                <option value="debug">Debug</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center relative group w-max">
+                Dimensión (Motor IA)
+                <Info className="w-4 h-4 ml-1 text-indigo-500 cursor-pointer" />
+                <div className="absolute bottom-full mb-2 left-0 sm:left-1/2 transform sm:-translate-x-1/2 hidden group-hover:block w-64 bg-gray-800 text-white text-xs rounded-md p-3 shadow-lg z-50 pointer-events-none">
+                  <ul className="space-y-2">
+                    <li><span className="font-semibold text-indigo-300">YOLOv8 (2D):</span> Rápido, ideal si hay multitudes en el video, pero con menos precisión espacial.</li>
+                    <li><span className="font-semibold text-indigo-300">MediaPipe (3D):</span> Alta precisión espacial (Z), pero optimizado para procesar <strong className="text-white">sólo a 1 persona</strong>.</li>
+                  </ul>
+                </div>
+              </label>
+              <select
+                value={poseMode}
+                onChange={(e) => setPoseMode(e.target.value as '2D' | '3D')}
+                className="w-full px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="2D">2D (YOLOv8 - Multitudes)</option>
+                <option value="3D">3D (MediaPipe - 1 Persona)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center relative group w-max">
+                Salto de frames
+                <Info className="w-4 h-4 ml-1 text-indigo-500 cursor-pointer" />
+                <div className="absolute bottom-full mb-2 left-0 sm:left-1/2 transform sm:-translate-x-1/2 hidden group-hover:block w-48 bg-gray-800 text-white text-xs rounded-md p-3 shadow-lg z-50 pointer-events-none">
+                  Dicta qué tan rápido procesa el video saltándose fotogramas (ideal para videos largos).
+                </div>
+              </label>
+              <select
+                value={framesSkip}
+                onChange={(e) => setFramesSkip(Number(e.target.value))}
+                className="w-full px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value={1}>1 de cada 1</option>
+                <option value={2}>1 de cada 2</option>
+                <option value={3}>1 de cada 3</option>
+                <option value={4}>1 de cada 4</option>
+                <option value={5}>1 de cada 5</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center relative group w-max">
+                Confianza mínima
+                <Info className="w-4 h-4 ml-1 text-indigo-500 cursor-pointer" />
+                <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-[80%] sm:-translate-x-1/2 hidden group-hover:block w-48 bg-gray-800 text-white text-xs rounded-md p-3 shadow-lg z-50 pointer-events-none">
+                  Filtro para evitar falsos positivos. Valores más altos son más estrictos.
+                </div>
+              </label>
+              <input
+                type="number"
+                min={0.1}
+                max={1}
+                step={0.05}
+                value={confidenceThreshold}
+                onChange={(e) => setConfidenceThreshold(Number(e.target.value))}
+                className="w-full px-3 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+          </div>
+
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={handleProcessVideo}
@@ -86,30 +294,6 @@ const VideoDetection = () => {
               Procesar video
             </button>
 
-            <div className="flex items-center gap-2">
-              <select
-                value={framesSkip}
-                onChange={(e) => setFramesSkip(Number(e.target.value))}
-                className="px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value={0}>Sin saltos de frames</option>
-                <option value={1}>1 frame</option>
-                <option value={2}>2 frames</option>
-                <option value={3}>3 frames (Por defecto)</option>
-                <option value={4}>4 frames</option>
-                <option value={5}>5 frames</option>
-              </select>
-
-              <select
-                value={poseMode}
-                onChange={(e) => setPoseMode(e.target.value as '2D' | '3D')}
-                className="px-3 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500"
-              >
-                <option value="2D">Estimación postural: 2D</option>
-                <option value="3D">Estimación postural: 3D</option>
-              </select>
-            </div>
-
             <button
               onClick={handleReuploadClick}
               className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 font-medium transition-colors ml-auto"
@@ -120,29 +304,29 @@ const VideoDetection = () => {
           </div>
 
           <div className="flex items-center mt-3 text-amber-700 text-xs px-3 py-2 bg-amber-50 rounded border border-amber-200">
-            <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" />
-            <span>¡Aviso! Reducir o quitar el salto de frames aumenta la carga computacional y alarga los tiempos de espera.</span>
+            <AlertTriangle className="w-4 h-4 mr-2 shrink-0" />
+            <span>Reducir el salto de frames aumenta la carga computacional y alarga los tiempos de espera.</span>
           </div>
 
           {isProcessing && (
             <div className="mt-4">
-              <p className="text-sm font-medium text-gray-600 mb-1">
-                Procesando video... Esto puede tomar algunos minutos dependiendo del tamaño del video.
-              </p>
+              <p className="text-sm font-medium text-gray-600 mb-1">Procesando video... Esto puede tomar varios minutos.</p>
               <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div 
-                  className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" 
-                  style={{ width: `${progress}%` }}
-                ></div>
+                <div className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
               </div>
+            </div>
+          )}
+
+          {errorMessage && (
+            <div className="mt-4 rounded-md bg-red-50 border border-red-200 p-4 text-red-700 text-sm">
+              <strong>Error:</strong> {errorMessage}
             </div>
           )}
         </div>
       </div>
+      </div>
 
-      {/* Video Preview Displays */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Loaded Video */}
         <div className="bg-white rounded-lg shadow-md p-4 border border-gray-100 flex flex-col">
           <h4 className="text-lg font-semibold text-gray-700 flex items-center mb-3">
             <CloudUpload className="w-5 h-5 mr-2 text-indigo-500" />
@@ -150,12 +334,12 @@ const VideoDetection = () => {
           </h4>
           <hr className="mb-4 border-gray-200" />
           
-          <div className="flex-grow bg-gray-100 rounded-md flex items-center justify-center overflow-hidden relative min-h-[300px]">
+          <div className="grow bg-gray-100 rounded-md flex items-center justify-center overflow-hidden relative min-h-[18.75rem]">
             {videoUrl ? (
               <video 
-                src={videoUrl} 
+                src={videoUrl || undefined}
                 controls 
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain bg-black"
               />
             ) : (
               <div className="text-center p-6 flex flex-col items-center">
@@ -166,45 +350,150 @@ const VideoDetection = () => {
           </div>
         </div>
 
-        {/* Processed Video */}
         <div className="bg-white rounded-lg shadow-md p-4 border border-gray-100 flex flex-col">
-          <h4 className="text-lg font-semibold text-gray-700 flex items-center mb-3">
-            <Loader className={`w-5 h-5 mr-2 text-indigo-500 ${isProcessing ? 'animate-spin' : ''}`} />
-            Video Procesado
-          </h4>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-lg font-semibold text-gray-700 flex items-center">
+              <Loader className={`w-5 h-5 mr-2 text-indigo-500 ${isProcessing ? 'animate-spin' : ''}`} />
+              Video Procesado
+            </h4>
+            {downloadUrl && (
+              <a 
+                href={downloadUrl} 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition"
+              >
+                <Download className="w-4 h-4 mr-1" /> Descargar
+              </a>
+            )}
+          </div>
           <hr className="mb-4 border-gray-200" />
           
-          <div className="flex-grow bg-gray-900 rounded-md flex items-center justify-center overflow-hidden min-h-[300px]">
-            {progress === 100 && !isProcessing ? (
-              <div className="text-center">
-                <p className="text-green-400 mb-2 font-medium">Procesado Completo</p>
-                {/* Normally an img tag displaying stream or final video */}
-                <span className="text-white text-sm opacity-70">Resultado visualizado aquí...</span>
-              </div>
+          <div className="grow bg-gray-900 rounded-md overflow-hidden min-h-[18.75rem] relative flex items-center justify-center">
+            {videoUrl ? (
+              <>
+                <video
+                  ref={videoRef}
+                  src={downloadUrl || videoUrl}
+                  controls
+                  onTimeUpdate={drawOverlay}
+                  onLoadedMetadata={drawOverlay}
+                  className="absolute inset-0 w-full h-full object-contain bg-black"
+                />
+                <canvas
+                  ref={canvasRef}
+                  className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                />
+              </>
             ) : isProcessing ? (
-              <div className="text-center">
+              <div className="text-center flex items-center justify-center h-full">
                 <Loader className="w-10 h-10 text-indigo-400 animate-spin mx-auto mb-3" />
                 <p className="text-indigo-200 text-sm">Procesando {progress}%...</p>
               </div>
             ) : (
               <div className="text-center p-6 flex flex-col items-center">
-                <p className="text-gray-500 italic">Procese el video cargado para continuar</p>
+                <p className="text-gray-500 italic">Procese el video cargado para ver la vista resultante.</p>
+              </div>
+            )}
+
+            {isProcessing && videoUrl && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/30 z-10">
+                <div className="text-center text-white">
+                  <Loader className="w-10 h-10 mx-auto animate-spin mb-3" />
+                  <p className="text-sm">Procesando {progress}%...</p>
+                </div>
               </div>
             )}
           </div>
         </div>
       </div>
       
-      {/* Information and Results (Placeholder) */}
-      <div className="bg-white rounded-lg shadow-md p-6 mt-6 border border-gray-100">
-        <h4 className="text-lg font-semibold text-gray-700 flex items-center mb-3">
-          <AlertTriangle className="w-5 h-5 mr-2 text-indigo-500" />
-          Información y Resultado
-        </h4>
-        <hr className="mb-4 border-gray-200" />
-        <div className="bg-gray-50 p-4 rounded-md min-h-[100px] flex items-center justify-center text-gray-500 text-sm">
-          Los resultados del análisis de comportamiento sospechoso aparecerán aquí.
+      <div className="bg-white rounded-lg shadow-md p-6 mt-6 border border-gray-100 relative overflow-hidden">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-lg font-semibold text-gray-700 flex items-center">
+            <AlertTriangle className="w-5 h-5 mr-2 text-indigo-500" />
+            Información y Resultado
+          </h4>
+          <div className="flex items-center space-x-3">
+            <span className={`text-sm font-bold px-3 py-1 rounded-full transition-colors ${isHostile ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+              {isHostile ? '¡Alerta Activa!' : 'Todo en orden'}
+            </span>
+            <img src={isHostile ? angryPoliceImg : policeImg} alt="Estado" className={`w-12 h-12 rounded-full border-2 transition-all ${isHostile ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.6)]' : 'border-green-500'}`} />
+          </div>
         </div>
+        <hr className="mb-4 border-gray-200" />
+
+        {shouldShowResult ? (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
+              <p className="text-sm text-gray-600 mb-2">Métricas del análisis</p>
+              <ul className="space-y-2 text-sm text-gray-700">
+                <li><strong>Frames totales:</strong> {totalFrames ?? 'N/A'}</li>
+                <li><strong>Duración (s):</strong> {durationSeconds ?? 'N/A'}</li>
+                <li><strong>Tiempo de proceso (s):</strong> {processingSeconds ?? 'N/A'}</li>
+                <li><strong>Actitudes sospechosas detectadas:</strong> {filteredDetections.length}</li>
+                <li><strong>Confianza promedio:</strong> {averageConfidence ?? 'N/A'}</li>
+              </ul>
+            </div>
+            
+            <div className="bg-gray-50 p-4 rounded-md border border-gray-200 flex flex-col h-full max-h-[300px]">
+              <p className="text-sm font-bold text-gray-700 mb-2">Actitudes Detectadas (Clic para saltar)</p>
+              
+              <div className="overflow-y-auto flex-1 pr-2 space-y-2 custom-scrollbar">
+                {filteredDetections.length > 0 ? (
+                  filteredDetections.map((det: any, index: number) => {
+                    
+                    const mins = Math.floor(det.segundo_inicio / 60).toString().padStart(2, '0');
+                    const secs = Math.floor(det.segundo_inicio % 60).toString().padStart(2, '0');
+                    const style = BEHAVIOR_LABELS[det.tipo_evento] || { label: det.tipo_evento, color: 'bg-gray-200 text-gray-700 border-gray-300' };
+
+                    return (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          if (videoRef.current) {
+                            videoRef.current.currentTime = det.segundo_inicio;
+                            videoRef.current.play();
+                          }
+                        }}
+                        className="w-full text-left bg-white p-3 rounded-lg border border-gray-200 shadow-sm hover:border-indigo-400 hover:shadow transition-all flex items-center justify-between group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
+                            {mins}:{secs}
+                          </span>
+                          <span className={`text-xs font-bold px-2 py-1 rounded border ${style.color}`}>
+                            {style.label}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-400 font-medium group-hover:text-indigo-500">
+                          {(det.confianza * 100).toFixed(0)}% <span className="hidden sm:inline">confianza</span>
+                        </div>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="h-full flex items-center justify-center text-sm text-gray-500 italic text-center px-4">
+                    No se detectaron miradas excesivas ni manos ocultas.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-gray-50 p-4 rounded-md min-h-[6.25rem] flex items-center justify-center text-gray-500 italic">
+            Los resultados del análisis de comportamiento aparecerán aquí cuando finalice el procesamiento.
+          </div>
+        )}
+
+        {(analysisResults || analysisReport) && (
+          <details className="mt-6 bg-gray-50 rounded-md border border-gray-200 text-xs text-gray-700">
+            <summary className="p-3 font-semibold cursor-pointer hover:bg-gray-100">Ver JSON completo (Debug)</summary>
+            <div className="p-4 border-t border-gray-200 overflow-auto max-h-64">
+              <pre className="whitespace-pre-wrap">{JSON.stringify(analysisResults || analysisReport, null, 2)}</pre>
+            </div>
+          </details>
+        )}
       </div>
     </div>
   );
