@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../config';
+import { useToast } from '../contexts/ToastContext';
 
 export const useLogin = () => {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -15,7 +17,7 @@ export const useLogin = () => {
     setError('');
     
     if (!email || !password) {
-      setError('Por favor complete todos los campos');
+      showToast('Por favor, ingresa tu correo y contraseña para continuar.', 'warning');
       return;
     }
 
@@ -30,6 +32,7 @@ export const useLogin = () => {
         // Guardamos un token falso en el localStorage
         localStorage.setItem('token', 'fake-jwt-token-bypass-desarrollo-12345');
         setLoading(false);
+        showToast('Sesión iniciada correctamente', 'success');
         // Navegamos a la ruta protegida correcta
         navigate('/app/dashboard'); 
       }, 1000);
@@ -47,13 +50,18 @@ export const useLogin = () => {
       const data = await res.json();
       if (res.ok && data?.detalle?.token) {
         localStorage.setItem('token', data.detalle.token);
+        showToast('Sesión iniciada correctamente', 'success');
         // Navegamos a la ruta protegida correcta
         navigate('/app/dashboard');
       } else {
-        setError(data?.mensaje || 'Credenciales inválidas');
+        const errorMsg = data?.mensaje || 'Credenciales inválidas. Verifica tu correo y contraseña e intenta nuevamente.';
+        setError(errorMsg);
+        showToast(errorMsg, 'error');
       }
     } catch (err) {
-      setError('Error de conexión al servidor');
+      const errorMsg = 'No se pudo establecer conexión con el servidor. Por favor, verifica tu conexión a internet e intenta nuevamente.';
+      setError(errorMsg);
+      showToast(errorMsg, 'error');
     } finally {
       setLoading(false);
     }

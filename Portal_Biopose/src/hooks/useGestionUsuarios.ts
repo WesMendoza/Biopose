@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { User } from '../interface/User';
 import api from '../lib/api';
 import { jwtDecode } from 'jwt-decode';
+import { useToast } from '../contexts/ToastContext';
 
 // ==========================================================
 // ALGORITMO DE VALIDACIÓN ECUATORIANA (CÉDULA)
@@ -32,6 +33,7 @@ const validarCedula = (cedula: string): boolean => {
 };
 
 export const useGestionUsuarios = () => {
+  const { showToast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<{ idRol: number; nombreRol: string }[]>([]);
 
@@ -148,18 +150,18 @@ export const useGestionUsuarios = () => {
     // 1. Validar Correo Electrónico
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(newUser.email)) {
-      alert("Por favor ingrese un correo electrónico válido.");
+      showToast("El formato del correo electrónico no es válido. Asegúrate de incluir un símbolo '@' y un dominio válido.", "warning");
       return;
     }
 
     // 2. Validar Cédula Ecuatoriana
     if (!validarCedula(newUser.identificacion)) {
-      alert("La cédula ingresada no es válida. Verifique los números.");
+      showToast("La cédula ingresada no es válida. Verifique los números.", "error");
       return;
     }
 
     if (!newUser.idRol) {
-      alert("Por favor seleccione un Rol");
+      showToast("Por favor seleccione un Rol para el usuario.", "warning");
       return;
     }
 
@@ -187,8 +189,9 @@ export const useGestionUsuarios = () => {
       
       closeModals();
       cargarDatos();
+      showToast("Usuario creado y rol asignado exitosamente.", "success");
     } catch (err: any) {
-      alert(err?.response?.mensaje || 'Error creando usuario o asignando rol');
+      showToast(err?.response?.mensaje || 'Error creando usuario o asignando rol.', "error");
     }
   };
 
@@ -198,13 +201,13 @@ export const useGestionUsuarios = () => {
     // 1. Validar Correo Electrónico
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(selectedUser.email)) {
-      alert("Por favor ingrese un correo electrónico válido.");
+      showToast("El formato del correo electrónico no es válido.", "warning");
       return;
     }
 
     // (Opcional) Validar cédula si tu backend permite editarla
     if (!validarCedula(selectedUser.identification)) {
-      alert("La cédula ingresada no es válida. Verifique los números.");
+      showToast("La cédula ingresada no es válida. Verifique los números.", "error");
       return;
     }
 
@@ -227,8 +230,9 @@ export const useGestionUsuarios = () => {
 
       closeModals();
       cargarDatos();
+      showToast("Usuario actualizado exitosamente.", "success");
     } catch (err: any) {
-      alert(err?.response?.mensaje || 'Error actualizando usuario');
+      showToast(err?.response?.mensaje || 'Error actualizando usuario.', "error");
     }
   };
 
@@ -238,8 +242,9 @@ export const useGestionUsuarios = () => {
         await api.del(`/api/users/eliminar/${selectedUser.identification}/`);
         closeModals();
         cargarDatos();
+        showToast("Usuario eliminado exitosamente.", "success");
       } catch (err: any) {
-        alert(err?.response?.mensaje || 'Error eliminando usuario');
+        showToast(err?.response?.mensaje || 'Error eliminando usuario.', "error");
       }
     } else {
       closeModals();

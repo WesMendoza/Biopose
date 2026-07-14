@@ -1,8 +1,10 @@
 import { useRef, useState, useEffect } from 'react';
 import api from '../lib/api';
 import { jwtDecode } from 'jwt-decode';
+import { useToast } from '../contexts/ToastContext';
 
 export const useCargaImagen = () => {
+  const { showToast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [width, setWidth] = useState(300);
@@ -97,7 +99,7 @@ export const useCargaImagen = () => {
       setIsPoseModalOpen(true);
       setIsPreviewModalOpen(false);
     } catch (error: any) {
-      alert(error?.response?.mensaje || 'Error al procesar la imagen');
+      showToast(error?.response?.mensaje || 'Error al procesar la imagen.', 'error');
       console.error(error);
     } finally {
       setIsProcessing(false);
@@ -128,7 +130,7 @@ export const useCargaImagen = () => {
   // === DESCARGAR TODO EL LOTE ===
   const handleDownloadBatch = async () => {
     if (batchResults.length === 0) {
-      alert("No hay imágenes en el conjunto para descargar.");
+      showToast("No hay imágenes en el conjunto para descargar.", "warning");
       return;
     }
 
@@ -147,12 +149,13 @@ export const useCargaImagen = () => {
       window.URL.revokeObjectURL(url);
 
       setBatchResults([]); 
+      showToast("Lote de imágenes descargado exitosamente.", "success");
       
       // Limpiar referencia porque fue agregada al lote, ya no es huérfana para borrarla
       currentImageIdRef.current = null;
     } catch (error: any) {
       console.error("Error al exportar lote a disco:", error);
-      alert("Error al intentar descargar el archivo ZIP del lote.");
+      showToast("Error al intentar descargar el archivo ZIP del lote.", "error");
     }
   };
 
@@ -173,7 +176,7 @@ export const useCargaImagen = () => {
 
   const handleSaveResults = async () => {
     if (!imageId || !poseResults) {
-      alert("Faltan datos de configuración o análisis previo para guardar.");
+      showToast("Faltan datos de configuración o análisis previo para guardar.", "warning");
       return;
     }
 
@@ -191,9 +194,10 @@ export const useCargaImagen = () => {
       window.URL.revokeObjectURL(url);
 
       setIsPoseModalOpen(false); 
+      showToast("Imagen y resultados descargados exitosamente.", "success");
     } catch (error: any) {
       console.error("Error al exportar a disco:", error);
-      alert("Error al intentar descargar el archivo ZIP.");
+      showToast("Error al intentar descargar el archivo ZIP.", "error");
     }
   };
 

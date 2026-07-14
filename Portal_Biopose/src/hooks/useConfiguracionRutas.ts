@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode'; // Importamos el decodificador
 import api from '../lib/api'; 
 import type { RouteItem } from '../interface/RouteItem';
+import { useToast } from '../contexts/ToastContext';
 
 export const useConfiguracionRutas = () => {
+  const { showToast } = useToast();
   const [mainPath, setMainPath] = useState('');
   const [fps, setFps] = useState<number | ''>('');
   const [isEditingFps, setIsEditingFps] = useState(false);
@@ -76,7 +78,7 @@ export const useConfiguracionRutas = () => {
       });
       return true;
     } catch (error) {;
-      alert("Error al guardar.");
+      showToast("Error al guardar la configuración.", "error");
       return false;
     } finally {
       setIsSaving(false);
@@ -85,11 +87,16 @@ export const useConfiguracionRutas = () => {
 
   // --- HANDLERS (Iguales, pero ahora llaman al guardar unificado) ---
   const handleSaveMainPath = async () => {
-    if (await guardarEnBaseDeDatos('RUTA_PRINCIPAL', mainPath)) alert("Guardado");
+    if (await guardarEnBaseDeDatos('RUTA_PRINCIPAL', mainPath)) {
+      showToast("Ruta principal guardada con éxito.", "success");
+    }
   };
 
   const handleSaveFps = async () => {
-    if (await guardarEnBaseDeDatos('FPS_DEFAULT', String(fps))) setIsEditingFps(false);
+    if (await guardarEnBaseDeDatos('FPS_DEFAULT', String(fps))) {
+      setIsEditingFps(false);
+      showToast("FPS guardados con éxito.", "success");
+    }
   };
 
   const handleCreateFolder = async () => {
@@ -98,6 +105,7 @@ export const useConfiguracionRutas = () => {
       setRoutes([...routes, { id: Date.now(), directory: fullPath, createdAt: new Date().toLocaleDateString() }]);
       setIsCreateModalOpen(false);
       setNewFolderName('');
+      showToast("Subruta creada con éxito.", "success");
     }
   };
   const handleDeleteRoute = async () => {

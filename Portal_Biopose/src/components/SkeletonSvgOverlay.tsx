@@ -21,18 +21,18 @@ interface SkeletonSvgOverlayProps {
 
 const defaultGetRealCoords = (x: number, y: number) => ({ x, y });
 
-export const SkeletonSvgOverlay: React.FC<SkeletonSvgOverlayProps> = ({
+export const SkeletonSvgOverlay = React.forwardRef<SVGSVGElement, SkeletonSvgOverlayProps>(({
   keypoints,
   naturalSize,
   selectedKp = null,
   onKpClick,
   onKpMouseDown,
   getRealCoords = defaultGetRealCoords
-}) => {
+}, ref) => {
   if (naturalSize.w === 0 || keypoints.length === 0) return null;
 
   return (
-    <svg viewBox={`0 0 ${naturalSize.w} ${naturalSize.h}`} className="absolute inset-0 w-full h-full pointer-events-none">
+    <svg ref={ref} viewBox={`0 0 ${naturalSize.w} ${naturalSize.h}`} className="absolute inset-0 w-full h-full pointer-events-none">
       {/* LÍNEAS DE COLORES */}
       {POSE_CONNECTIONS.map((connection, idx) => {
         const kp1 = keypoints.find(k => k.id === connection.pair[0]);
@@ -105,4 +105,4 @@ export const SkeletonSvgOverlay: React.FC<SkeletonSvgOverlayProps> = ({
       })}
     </svg>
   );
-};
+});

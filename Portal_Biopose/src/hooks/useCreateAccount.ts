@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
+import { useToast } from '../contexts/ToastContext';
 
 // ==========================================================
 // ALGORITMOS DE VALIDACIÓN ECUATORIANA
@@ -69,6 +70,7 @@ const validarRuc = (ruc: string): boolean => {
 
 export const useCreateAccount = () => {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [empresas, setEmpresas] = useState<any[]>([]);
   const [isCrearEmpresa, setIsCrearEmpresa] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -117,35 +119,35 @@ export const useCreateAccount = () => {
     // 1. Validar Correo Electrónico
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.correo)) {
-      alert("Por favor ingrese un correo electrónico válido.");
+      showToast("El formato del correo electrónico no es válido. Asegúrate de incluir un símbolo '@' y un dominio válido (ej. usuario@empresa.com).", "warning");
       return;
     }
 
     // 2. Validar Cédula Ecuatoriana
     if (!validarCedula(formData.identificacion)) {
-      alert("La cédula ingresada no es válida. Revise los números ingresados.");
+      showToast("La cédula ingresada no es válida. Revise los números ingresados.", "error");
       return;
     }
 
     // 3. Validar Celular (10 dígitos, empieza con 09)
     if (formData.celular.length !== 10 || !formData.celular.startsWith('09')) {
-      alert("El número de celular debe tener 10 dígitos y empezar con '09'.");
+      showToast("El número de celular debe tener 10 dígitos y empezar con '09'.", "warning");
       return;
     }
 
     // 4. Validar Empresa / RUC
     if (isCrearEmpresa) {
       if (!formData.nombreEmpresa || !formData.rucEmpresa) {
-        alert("Por favor ingrese el nombre y RUC de su nueva empresa.");
+        showToast("Para registrar una nueva empresa, es obligatorio proporcionar tanto el Nombre Comercial como el número de RUC.", "warning");
         return;
       }
       if (!validarRuc(formData.rucEmpresa)) {
-        alert("El RUC ingresado no es válido según los estándares ecuatorianos (Natural, Pública o Privada).");
+        showToast("El RUC ingresado no es válido según los estándares ecuatorianos (Natural, Pública o Privada).", "error");
         return;
       }
     } else {
       if (!formData.codigoEmpresa) {
-        alert("Por favor seleccione una empresa para unirse.");
+        showToast("Por favor seleccione una empresa para unirse.", "warning");
         return;
       }
     }
@@ -165,10 +167,11 @@ export const useCreateAccount = () => {
     api.post('/api/auth/registerAccount/', payload)
       .then(() => {
         setIsSuccess(true);
-        setTimeout(() => navigate('/login'), 1500);
+        showToast("Cuenta registrada exitosamente. Serás redirigido al inicio de sesión.", "success");
+        setTimeout(() => navigate('/login'), 2000);
       })
       .catch((err) => {
-        alert(err?.response?.data?.detalle || err?.response?.mensaje || 'Error registrando usuario');
+        showToast(err?.response?.data?.detalle || err?.response?.mensaje || 'Error registrando usuario. Intenta nuevamente.', 'error');
       });
   };
 

@@ -248,6 +248,7 @@ const GenerarImagenes = () => {
                       <canvas ref={displayCanvasRef} className="block max-w-none shadow-2xl rounded-sm pointer-events-none select-none" />
                       
                       <SkeletonSvgOverlay 
+                        ref={svgRef}
                         keypoints={validKeypoints}
                         naturalSize={videoSize}
                         selectedKp={selectedKp}
