@@ -210,15 +210,13 @@ export const useLiveDetection = () => {
                  setNumPeople(data.num_people);
                }
                if (data.detections && Array.isArray(data.detections)) {
-                 data.detections.forEach((behavior: string) => {
-                   if (!seenBehaviorsRef.current.has(behavior)) {
-                     seenBehaviorsRef.current.add(behavior);
-                     setRealtimeDetections(prev => [
-                       ...prev,
-                       { behavior, label: BEHAVIOR_LABELS[behavior] || behavior }
-                     ]);
-                   }
-                 });
+                 const currentFrameDetections = data.detections.map((behavior: string) => ({
+                   behavior, 
+                   label: BEHAVIOR_LABELS[behavior] || behavior
+                 }));
+                 setRealtimeDetections(currentFrameDetections);
+               } else {
+                 setRealtimeDetections([]);
                }
 
                // Enviar el SIGUIENTE frame inmediatamente después de procesar el anterior

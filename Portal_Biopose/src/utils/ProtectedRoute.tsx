@@ -26,9 +26,18 @@ const ProtectedRoute = ({ children, requiredRoute }: ProtectedRouteProps) => {
         const decoded: any = jwtDecode(token);
         const idUsuario = decoded.idUsuario;
 
-        const res = await api.get(`/api/menuOpciones/opciones/usuario/${idUsuario}/`);
-        const detalle = res?.detalle || res || [];
-        const rutasPermitidas = detalle.map((item: any) => item.ruta);
+        const cacheKey = `rutas_${idUsuario}`;
+        const cachedRutas = sessionStorage.getItem(cacheKey);
+        let rutasPermitidas: string[] = [];
+
+        if (cachedRutas) {
+          rutasPermitidas = JSON.parse(cachedRutas);
+        } else {
+          const res = await api.get(`/api/menuOpciones/opciones/usuario/${idUsuario}/`);
+          const detalle = res?.detalle || res || [];
+          rutasPermitidas = detalle.map((item: any) => item.ruta);
+          sessionStorage.setItem(cacheKey, JSON.stringify(rutasPermitidas));
+        }
 
         if (rutasPermitidas.includes(requiredRoute)) {
           setAccesoPermitido(true);

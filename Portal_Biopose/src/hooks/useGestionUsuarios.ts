@@ -137,13 +137,17 @@ export const useGestionUsuarios = () => {
   };
 
   const updateEditUserField = (field: keyof User, value: any) => {
-    if (!selectedUser) return;
-    let finalValue = value;
-    if (field === 'identification') {
-      finalValue = String(value).replace(/\D/g, ''); // Eliminar todo lo que no sea número
-      if (finalValue.length > 10) finalValue = finalValue.slice(0, 10);
-    }
-    setSelectedUser({ ...selectedUser, [field]: finalValue });
+    setSelectedUser(prev => {
+      if (!prev) return prev;
+      
+      let finalValue = value;
+      if (field === 'identification') {
+        finalValue = value.replace(/\D/g, '');
+        if (finalValue.length > 10) finalValue = finalValue.slice(0, 10);
+      }
+      
+      return { ...prev, [field]: finalValue };
+    });
   };
 
   const handleCreateUser = async () => {
@@ -216,6 +220,7 @@ export const useGestionUsuarios = () => {
         nombre: selectedUser.fullName.split(' ')[0], 
         apellido: selectedUser.fullName.split(' ').slice(1).join(' '),
         correo: selectedUser.email,
+        estado: selectedUser.isActive ? 'A' : 'I'
       };
 
       await api.patch(`/api/users/actualizarPorCedula/${selectedUser.identification}/`, payloadUser);

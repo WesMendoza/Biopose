@@ -34,8 +34,16 @@ export const useConfiguracionRutas = () => {
   const fetchConfiguraciones = async () => {
     if (!idEmpresa) return;
     try {
-      // Tu apiFetch ya devuelve el JSON parseado directamente
-      const data = await api.get(`/api/menuOpciones/rutas/configurar/?idEmpresa=${idEmpresa}`);
+      const cacheKey = `config_${idEmpresa}`;
+      const cachedConfig = sessionStorage.getItem(cacheKey);
+      let data;
+      
+      if (cachedConfig) {
+        data = JSON.parse(cachedConfig);
+      } else {
+        data = await api.get(`/api/menuOpciones/rutas/configurar/?idEmpresa=${idEmpresa}`);
+        sessionStorage.setItem(cacheKey, JSON.stringify(data));
+      }
       
       if (!Array.isArray(data)) {
         return;
@@ -76,6 +84,8 @@ export const useConfiguracionRutas = () => {
         valor,
         idEmpresa // Enviamos la empresa al back
       });
+      // Limpiar caché para que otras pantallas recarguen el cambio
+      sessionStorage.removeItem(`config_${idEmpresa}`);
       return true;
     } catch (error) {;
       showToast("Error al guardar la configuración.", "error");

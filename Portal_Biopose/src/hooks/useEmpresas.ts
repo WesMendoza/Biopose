@@ -130,7 +130,7 @@ export const useEmpresas = () => {
     }
 
     try {
-      await api.patch(`/api/gestionEmpresas/empresas/actualizar/${selectedEmpresa.idEmpresa}/`, {
+      await api.patch(`/api/gestionEmpresas/empresas/${selectedEmpresa.codigoEmpresa}/`, {
         nombreEmpresa: selectedEmpresa.nombreEmpresa,
         ruc: selectedEmpresa.ruc,
         direccion: selectedEmpresa.direccion

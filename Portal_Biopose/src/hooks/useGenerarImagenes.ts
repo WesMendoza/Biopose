@@ -52,7 +52,17 @@ export const useGenerarImagenes = () => {
       try {
         const decoded: any = jwtDecode(token);
         const idEmpresa = decoded.idEmpresa;
-        const response = await api.get(`/api/menuOpciones/rutas/configurar/?idEmpresa=${idEmpresa}`);
+        const cacheKey = `config_${idEmpresa}`;
+        const cachedConfig = sessionStorage.getItem(cacheKey);
+        
+        let response;
+        if (cachedConfig) {
+          response = JSON.parse(cachedConfig);
+        } else {
+          response = await api.get(`/api/menuOpciones/rutas/configurar/?idEmpresa=${idEmpresa}`);
+          sessionStorage.setItem(cacheKey, JSON.stringify(response));
+        }
+
         if (Array.isArray(response)) {
             const fpsConfig = response.find((item: any) => item.codigo === 'FPS_DEFAULT');
             if (fpsConfig) setFps(Number(fpsConfig.valor));

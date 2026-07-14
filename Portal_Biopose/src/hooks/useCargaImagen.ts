@@ -24,18 +24,7 @@ export const useCargaImagen = () => {
   const currentImageIdRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const cargarRutas = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-      try {
-        const decoded: any = jwtDecode(token);
-        const idEmpresa = decoded.idEmpresa;
-        await api.get(`/api/menuOpciones/rutas/configurar/?idEmpresa=${idEmpresa}`);
-      } catch (error) {
-        console.error("Error al cargar rutas:", error);
-      }
-    };
-    cargarRutas();
+    // Inicialización al montar el componente (sin peticiones innecesarias)
 
     return () => {
       // Limpieza pasiva al desmontar si quedó una imagen huérfana
