@@ -55,6 +55,7 @@ export const useLiveActionMultiPerson = () => {
   const streamRef = useRef<MediaStream | null>(null);
   
   const frameIntervalRef = useRef<number | null>(null);
+  const clearAlertsTimeoutRef = useRef<number | null>(null);
   const seenBehaviorsRef = useRef<Set<string>>(new Set());
 
   // =======================================================================
@@ -204,14 +205,35 @@ export const useLiveActionMultiPerson = () => {
                if (data.num_people !== undefined) {
                  setNumPeople(data.num_people);
                }
-               if (data.detections && Array.isArray(data.detections)) {
+               if (data.detections && Array.isArray(data.detections) && data.detections.length > 0) {
                  const currentFrameDetections = data.detections.map((behavior: string) => ({
                    behavior, 
                    label: ACTION_LABELS[behavior] || behavior
                  }));
                  setRealtimeDetections(currentFrameDetections);
+                 
+                 // Limpiar cualquier timeout pendiente ya que recibimos una nueva detección
+                 if (clearAlertsTimeoutRef.current) {
+                   window.clearTimeout(clearAlertsTimeoutRef.current);
+                   clearAlertsTimeoutRef.current = null;
+                 }
                } else {
-                 setRealtimeDetections([]);
+                 // Si no hay personas, limpiar instantáneamente
+                 if (data.num_people === 0) {
+                   if (clearAlertsTimeoutRef.current) {
+                     window.clearTimeout(clearAlertsTimeoutRef.current);
+                     clearAlertsTimeoutRef.current = null;
+                   }
+                   setRealtimeDetections([]);
+                 } else {
+                   // Hay personas, pero no hay detección, aplicar debouncer para evitar parpadeos
+                   if (!clearAlertsTimeoutRef.current) {
+                     clearAlertsTimeoutRef.current = window.setTimeout(() => {
+                       setRealtimeDetections([]);
+                       clearAlertsTimeoutRef.current = null;
+                     }, 2000);
+                   }
+                 }
                }
 
                frameIntervalRef.current = window.setTimeout(sendFrame, 10);
