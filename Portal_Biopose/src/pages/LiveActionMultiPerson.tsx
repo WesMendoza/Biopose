@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Camera, StopCircle, PlayCircle, AlertTriangle, Users, RotateCcw, ExternalLink, Search, X, Clock, Flame, Zap } from 'lucide-react';
+import { Camera, StopCircle, PlayCircle, AlertTriangle, Users, RotateCcw, ExternalLink, Search, X, Clock, HandFist, Zap } from 'lucide-react';
 import { useLiveActionMultiPerson } from '../hooks/useLiveActionMultiPerson';
 import type { FinalActionDetection } from '../hooks/useLiveActionMultiPerson';
 
@@ -7,7 +7,7 @@ import type { FinalActionDetection } from '../hooks/useLiveActionMultiPerson';
 // ICONOS POR TIPO DE EVENTO
 // =========================================================================
 const ACTION_ICONS: Record<string, React.ReactNode> = {
-  PELEAR: <Flame className="w-4 h-4" />,
+  PELEAR: <HandFist className="w-4 h-4" />,
   DISTURBIO: <Zap className="w-4 h-4" />,
 };
 
@@ -224,7 +224,7 @@ const LiveActionMultiPerson = () => {
               </p>
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm text-gray-700">
-                  <Flame className="w-4 h-4 text-red-500" />
+                  <HandFist className="w-4 h-4 text-red-500" />
                   <span>Peleas y agresiones</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-700">

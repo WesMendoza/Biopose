@@ -1,14 +1,14 @@
-import { Edit2, Save, Trash2, X } from 'lucide-react';
+import { Edit2, Save, X } from 'lucide-react';
 import { useEmpresas } from '../hooks/useEmpresas';
 
 const GestionEmpresas = () => {
   const {
     empresas, loading,
-    isEditModalOpen, isDeleteModalOpen,
+    isEditModalOpen,
     selectedEmpresa, 
     updateEditEmpresaField,
-    handleEditClick, handleDeleteClick,
-    closeModals, handleSaveEmpresa, confirmDelete
+    handleEditClick,
+    closeModals, handleSaveEmpresa
   } = useEmpresas();
 
   return (
@@ -41,9 +41,6 @@ const GestionEmpresas = () => {
                 <td className="p-4 flex justify-center space-x-2">
                   <button onClick={() => handleEditClick(empresa)} className="p-1 text-blue-600 hover:bg-blue-100 rounded" title="Editar Empresa">
                     <Edit2 size={18} />
-                  </button>
-                  <button onClick={() => handleDeleteClick(empresa)} className="p-1 text-red-600 hover:bg-red-100 rounded" title="Eliminar Empresa">
-                    <Trash2 size={18} />
                   </button>
                 </td>
               </tr>
@@ -103,19 +100,6 @@ const GestionEmpresas = () => {
         </div>
       )}
 
-      {/* Modal Eliminar */}
-      {isDeleteModalOpen && selectedEmpresa && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-sm p-6 text-center relative">
-            <h2 className="text-xl font-bold mb-2">¿Eliminar Empresa?</h2>
-            <p className="mb-6 text-sm text-gray-600">Esta acción no se puede deshacer.</p>
-            <div className="flex justify-center space-x-4">
-              <button onClick={closeModals} className="px-6 py-2 border rounded-md text-gray-700 hover:bg-gray-50">No</button>
-              <button onClick={confirmDelete} className="px-6 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Sí, eliminar</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

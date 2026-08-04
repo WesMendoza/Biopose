@@ -6,7 +6,7 @@ export const useVerificarImagenes = () => {
   const [selectedFile, setSelectedFile] = useState('');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [errorFile, setErrorFile] = useState(false);
-  
+
   const [availableFiles, setAvailableFiles] = useState<any[]>([]);
   const [poseResults, setPoseResults] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +32,7 @@ export const useVerificarImagenes = () => {
     // Extraer solo las imágenes para el Dropdown
     const imageFiles = files.filter(f => f.name.match(/\.(jpg|jpeg|png)$/i));
     const sortedImages = imageFiles.sort((a, b) => a.name.localeCompare(b.name));
-    
+
     setAvailableFiles(sortedImages.map(f => ({ id: f.name, name: f.name })));
   };
 
@@ -72,29 +72,40 @@ export const useVerificarImagenes = () => {
       reader.onload = (event) => {
         try {
           const parsed = JSON.parse(event.target?.result as string);
-          
+
           // CASO A: Es un fotograma de video (lote unificado)
           if (selectedFile.includes('_frame_')) {
             const match = selectedFile.match(/_frame_(\d+)/);
             if (match) {
               const frameIdx = parseInt(match[1], 10) - 1;
               let framesList = Array.isArray(parsed) ? parsed : (parsed.keypoints_data || parsed.keypoints || parsed.frames || parsed.data || []);
-              
+
               if (framesList[frameIdx]) {
                 let frameInfo = framesList[frameIdx];
                 let rawPts = typeof frameInfo === 'string' ? JSON.parse(frameInfo) : frameInfo;
-                let ptsArray = rawPts.keypoints_json || rawPts.keypoints || rawPts;
                 
-                if (typeof ptsArray === 'string') {
-                  try { ptsArray = JSON.parse(ptsArray); } catch(e) { ptsArray = []; }
-                }
-
                 let personsList: any[] = [];
-                if (Array.isArray(ptsArray)) {
-                  if (ptsArray.length > 0 && Array.isArray(ptsArray[0])) {
-                    ptsArray.forEach((p, i) => personsList.push({ person_id: i, keypoints: p }));
-                  } else {
-                    personsList.push({ person_id: 0, keypoints: ptsArray });
+                if (rawPts.persons && Array.isArray(rawPts.persons)) {
+                  rawPts.persons.forEach((person: any, i: number) => {
+                    let kps = person.keypoints_json || person.keypoints || [];
+                    if (typeof kps === 'string') {
+                       try { kps = JSON.parse(kps); } catch(e) { kps = []; }
+                    }
+                    personsList.push({ person_id: person.person_id !== undefined ? person.person_id : i, keypoints: kps });
+                  });
+                } else {
+                  let ptsArray = rawPts.keypoints_json || rawPts.keypoints || rawPts;
+                  
+                  if (typeof ptsArray === 'string') {
+                    try { ptsArray = JSON.parse(ptsArray); } catch(e) { ptsArray = []; }
+                  }
+
+                  if (Array.isArray(ptsArray)) {
+                    if (ptsArray.length > 0 && Array.isArray(ptsArray[0])) {
+                      ptsArray.forEach((p: any, i: number) => personsList.push({ person_id: i, keypoints: p }));
+                    } else {
+                      personsList.push({ person_id: 0, keypoints: ptsArray });
+                    }
                   }
                 }
 
@@ -126,13 +137,13 @@ export const useVerificarImagenes = () => {
     }
   };
 
-return {
+  return {
     folderName,
     selectedFile, setSelectedFile,
     imageUrl, setImageUrl,
     errorFile, setErrorFile,
     availableFiles,
-    poseResults, 
+    poseResults,
     setPoseResults,
     isLoading,
     handleLoadImage,

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import api from '../lib/api';
 import type { MenuOpcion } from '../interface/MenuOpcion';
 import type { Rol } from '../interface/Rol';
+import { useToast } from '../contexts/ToastContext';
 
 export const useRoles = () => {
+  const { showToast } = useToast();
   const [roles, setRoles] = useState<Rol[]>([]);
   const [rutasDisponibles, setRutasDisponibles] = useState<MenuOpcion[]>([]);
   const [loading, setLoading] = useState(false);
@@ -105,8 +107,9 @@ export const useRoles = () => {
       });
       await fetchRoles();
       closeModals();
+      showToast('Rol creado exitosamente.', 'success');
     } catch (err: any) {
-      alert(err?.response?.mensaje || 'Error creando el rol');
+      showToast(err?.response?.mensaje || 'No se pudo crear el rol. Intenta nuevamente.', 'error');
     }
   };
 
@@ -119,8 +122,9 @@ export const useRoles = () => {
         });
         await fetchRoles();
         closeModals();
+        showToast('Rol actualizado exitosamente.', 'success');
       } catch (err: any) {
-        alert(err?.response?.mensaje || 'Error actualizando el rol');
+        showToast(err?.response?.mensaje || 'No se pudo actualizar el rol. Intenta nuevamente.', 'error');
       }
     }
   };
@@ -131,8 +135,9 @@ export const useRoles = () => {
         await api.del(`/api/gestionEmpresas/roles/${selectedRol.idRol}/`);
         setRoles(roles.filter(r => r.idRol !== selectedRol.idRol));
         closeModals();
+        showToast('Rol eliminado exitosamente.', 'success');
       } catch (err: any) {
-        alert(err?.response?.mensaje || 'Error eliminando el rol');
+        showToast(err?.response?.mensaje || 'No se pudo eliminar el rol. Verifica que no tenga usuarios asignados e intenta nuevamente.', 'error');
       }
     }
   };

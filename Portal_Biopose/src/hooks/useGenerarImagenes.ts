@@ -2,8 +2,10 @@ import { useRef, useState, useEffect } from 'react';
 import { API_BASE } from '../config'; 
 import api from '../lib/api';
 import { jwtDecode } from 'jwt-decode';
+import { useToast } from '../contexts/ToastContext';
 
 export const useGenerarImagenes = () => {
+  const { showToast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [fps, setFps] = useState<number>(5);
@@ -50,7 +52,17 @@ export const useGenerarImagenes = () => {
       try {
         const decoded: any = jwtDecode(token);
         const idEmpresa = decoded.idEmpresa;
-        const response = await api.get(`/api/menuOpciones/rutas/configurar/?idEmpresa=${idEmpresa}`);
+        const cacheKey = `config_${idEmpresa}`;
+        const cachedConfig = sessionStorage.getItem(cacheKey);
+        
+        let response;
+        if (cachedConfig) {
+          response = JSON.parse(cachedConfig);
+        } else {
+          response = await api.get(`/api/menuOpciones/rutas/configurar/?idEmpresa=${idEmpresa}`);
+          sessionStorage.setItem(cacheKey, JSON.stringify(response));
+        }
+
         if (Array.isArray(response)) {
             const fpsConfig = response.find((item: any) => item.codigo === 'FPS_DEFAULT');
             if (fpsConfig) setFps(Number(fpsConfig.valor));
@@ -174,7 +186,7 @@ export const useGenerarImagenes = () => {
 
   const handleSaveResults = async () => {
     if (!videoId || keypointsData.length === 0) {
-      alert("Faltan datos para descargar la colección de fotogramas.");
+      showToast("Faltan datos para descargar la colección de fotogramas.", "warning");
       return;
     }
     
@@ -200,10 +212,11 @@ export const useGenerarImagenes = () => {
       window.URL.revokeObjectURL(url);
 
       // MAGIA: Ejecutamos la limpieza total tras una descarga exitosa
+      showToast("Colección de fotogramas descargada con éxito.", "success");
       handleReuploadClick(); 
     } catch (error: any) {
       console.error("Error al descargar el ZIP:", error);
-      alert("Error al intentar descargar los archivos en formato ZIP.");
+      showToast("Error al intentar descargar los archivos en formato ZIP.", "error");
     } finally {
       setIsDownloading(false);
     }

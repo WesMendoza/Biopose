@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { Empresa } from '../interface/Empresa';
 import api from '../lib/api';
+import { useToast } from '../contexts/ToastContext';
 
 // ==========================================================
 // ALGORITMOS DE VALIDACIÓN ECUATORIANA (CÉDULA Y RUC)
@@ -69,11 +70,11 @@ const validarRuc = (ruc: string): boolean => {
 
 
 export const useEmpresas = () => {
+  const { showToast } = useToast();
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const [selectedEmpresa, setSelectedEmpresa] = useState<Empresa | null>(null);
 
@@ -99,14 +100,8 @@ export const useEmpresas = () => {
     setIsEditModalOpen(true);
   };
 
-  const handleDeleteClick = (empresa: Empresa) => {
-    setSelectedEmpresa(empresa);
-    setIsDeleteModalOpen(true);
-  };
-
   const closeModals = () => {
     setIsEditModalOpen(false);
-    setIsDeleteModalOpen(false);
     setSelectedEmpresa(null);
   };
 
@@ -130,40 +125,30 @@ export const useEmpresas = () => {
 
     // VALIDACIÓN ESTRICTA DEL RUC ANTES DE ENVIAR A LA BASE DE DATOS
     if (!selectedEmpresa.ruc || !validarRuc(selectedEmpresa.ruc)) {
-      alert("El RUC ingresado no es válido según las normativas ecuatorianas. Verifique que tenga 13 dígitos y sea correcto.");
+      showToast("El RUC ingresado no es válido según las normativas ecuatorianas. Verifique que tenga 13 dígitos y sea correcto.", "error");
       return;
     }
 
     try {
-      await api.patch(`/api/gestionEmpresas/empresas/actualizar/${selectedEmpresa.idEmpresa}/`, {
+      await api.patch(`/api/gestionEmpresas/empresas/${selectedEmpresa.codigoEmpresa}/`, {
         nombreEmpresa: selectedEmpresa.nombreEmpresa,
         ruc: selectedEmpresa.ruc,
         direccion: selectedEmpresa.direccion
       });
       closeModals();
       loadEmpresas();
+      showToast("Datos de la empresa actualizados exitosamente.", "success");
     } catch (error: any) {
-      alert(error?.response?.mensaje || 'Error al actualizar la empresa');
-    }
-  };
-
-  const confirmDelete = async () => {
-    if (!selectedEmpresa) return;
-    try {
-      await api.del(`/api/gestionEmpresas/empresas/eliminar/${selectedEmpresa.idEmpresa}/`);
-      closeModals();
-      loadEmpresas();
-    } catch (error: any) {
-      alert(error?.response?.mensaje || 'Error al eliminar la empresa');
+      showToast(error?.response?.mensaje || 'Error al actualizar la empresa.', 'error');
     }
   };
 
   return {
     empresas, loading,
-    isEditModalOpen, isDeleteModalOpen,
+    isEditModalOpen,
     selectedEmpresa, 
     updateEditEmpresaField, // Exponemos la nueva función al componente
-    handleEditClick, handleDeleteClick,
-    closeModals, handleSaveEmpresa, confirmDelete
+    handleEditClick,
+    closeModals, handleSaveEmpresa
   };
 };

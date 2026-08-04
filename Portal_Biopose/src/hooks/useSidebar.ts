@@ -21,13 +21,18 @@ export const useSidebar = () => {
           const idUsuario = decoded.idUsuario;
 
           if (idUsuario) {
-            // Llamamos a tu endpoint en Django que trae los permisos del usuario
-            const res = await api.get(`/api/menuOpciones/opciones/usuario/${idUsuario}/`);
-            const detalle = res?.detalle || res || [];
+            const cacheKey = `rutas_${idUsuario}`;
+            const cachedRutas = sessionStorage.getItem(cacheKey);
             
-            // Extraemos solo el texto de la ruta (ej: "/app/users") y lo guardamos
-            const rutas = detalle.map((item: any) => item.ruta);
-            setRutasPermitidas(rutas);
+            if (cachedRutas) {
+              setRutasPermitidas(JSON.parse(cachedRutas));
+            } else {
+              const res = await api.get(`/api/menuOpciones/opciones/usuario/${idUsuario}/`);
+              const detalle = res?.detalle || res || [];
+              const rutas = detalle.map((item: any) => item.ruta);
+              sessionStorage.setItem(cacheKey, JSON.stringify(rutas));
+              setRutasPermitidas(rutas);
+            }
           }
         } catch (error) {
           console.error("Error al obtener el menú permitido:", error);
@@ -52,6 +57,7 @@ export const useSidebar = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    sessionStorage.clear();
     navigate('/login');
   };
 

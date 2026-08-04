@@ -253,7 +253,12 @@ const VideoDetection = () => {
               <select
                 value={framesSkip}
                 onChange={(e) => setFramesSkip(Number(e.target.value))}
-                className="w-full px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={mode !== 'operativo'}
+                className={`w-full px-3 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  mode !== 'operativo' 
+                    ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed' 
+                    : 'bg-blue-50 text-blue-700 border border-blue-200'
+                }`}
               >
                 <option value={1}>1 de cada 1</option>
                 <option value={2}>1 de cada 2</option>

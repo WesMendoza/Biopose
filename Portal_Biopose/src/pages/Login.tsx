@@ -17,22 +17,10 @@ const Login = () => {
     error, handleLogin
   } = useLogin();
 
-  const [toast, setToast] = useState({ show: false, message: '' });
   const [currentImage, setCurrentImage] = useState(0);
 
 										
   const banners = [banner1, banner2, banner3];
-
-								  
-  useEffect(() => {
-    if (error) {
-      setToast({ show: true, message: error });
-      const timer = setTimeout(() => {
-        setToast(prev => ({ ...prev, show: false }));
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [error]);
 
 															   
   useEffect(() => {
@@ -49,24 +37,7 @@ const Login = () => {
       {/* Brillo celeste de fondo para que no sea totalmente plano */}
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-[#0ea5e9] opacity-[0.08] rounded-full blur-[120px] pointer-events-none"></div>
 
-      {/* --- TOAST DE ERROR FLOTANTE --- */}
-      <div 
-        className={`fixed top-6 right-6 z-50 flex items-center w-full max-w-sm p-4 text-white bg-red-600/95 backdrop-blur-sm rounded-lg shadow-2xl border border-red-500 transition-all duration-500 transform ${
-          toast.show ? 'translate-y-0 opacity-100 visible' : '-translate-y-10 opacity-0 invisible'
-        }`}
-        role="alert"
-      >
-        <div className="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 bg-white/20 rounded-lg">
-          <AlertCircle className="w-5 h-5 text-white" />
-        </div>
-        <div className="ml-3 text-sm font-medium mr-4">{toast.message}</div>
-        <button 
-          onClick={() => setToast(prev => ({ ...prev, show: false }))}
-          className="ml-auto -mx-1.5 -my-1.5 bg-transparent text-white hover:bg-white/20 rounded-lg focus:ring-2 focus:ring-white p-1.5 inline-flex h-8 w-8 transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
+
 
       {/* --- CONTENEDOR PRINCIPAL TIPO TARJETA --- */}
       <div className="w-full max-w-[1400px] min-h-[600px] flex flex-col lg:flex-row bg-white rounded-[2rem] overflow-hidden shadow-2xl relative z-10">

@@ -239,6 +239,7 @@ const CargaImagen = () => {
 
                   {naturalSize.w > 0 && validKeypoints.length > 0 && (
                     <SkeletonSvgOverlay 
+                      ref={svgRef}
                       keypoints={validKeypoints}
                       naturalSize={naturalSize}
                       selectedKp={selectedKp}
