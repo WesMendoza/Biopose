@@ -1,73 +1,79 @@
-# React + TypeScript + Vite
+# Portal BioPose - FrontEnd
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Este es el frontend del proyecto **BioPose** desarrollado con React, TypeScript y Vite.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🛠️ Requisitos Previos
 
-## React Compiler
+Antes de comenzar, asegúrate de tener instalado:
+* **Node.js** (versión 18 o superior recomendada)
+* **npm** (incluido con Node.js)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## 🚀 Instalación de Dependencias
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Para instalar todas las librerías necesarias del proyecto, ejecuta el siguiente comando en la terminal desde la carpeta `Portal_Biopose`:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```powershell
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 🌍 Manejo de Entornos y Archivos `.env`
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+El proyecto está configurado para manejar dos ambientes mediante archivos de variables de entorno y modos de Vite:
+
+1. **Ambiente Desplegado (Producción)**:
+   * Administrado por el archivo [.env](.env).
+   * Apunta a la API pública de producción:
+     ```env
+     VITE_API_BASE_URL=https://16.58.233.154.nip.io
+     ```
+
+2. **Ambiente Local (Desarrollo)**:
+   * Administrado por el archivo [.env.dev](.env.dev).
+   * Apunta a tu servidor Django local:
+     ```env
+     VITE_API_BASE_URL=http://127.0.0.1:8000
+     ```
+
+---
+
+## 💻 Comandos del Proyecto
+
+### 1. Iniciar en Desarrollo (Local - Apuntando a Backend Local)
+Levanta la aplicación localmente conectándose a tu backend local (`http://127.0.0.1:8000`):
+```powershell
+npm run dev
+```
+
+### 2. Compilar para Producción
+Genera la versión compilada y optimizada para producción (usará la API de producción configurada en el archivo `.env`):
+```powershell
+npm run build
+```
+* Generará una carpeta llamada `/dist` con los archivos listos para desplegar.
+
+### 3. Probar la versión de Producción Localmente
+Levanta un servidor local para probar la versión generada en `/dist`:
+```powershell
+npm run preview
+```
+
+---
+
+## 📁 Estructura de Scripts en `package.json`
+
+Los scripts configurados en el proyecto son:
+
+```json
+"scripts": {
+  "dev": "vite --mode dev",
+  "build": "vite build",
+  "lint": "eslint .",
+  "preview": "vite preview"
+}
 ```
